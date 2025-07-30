@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Users, Target, MessageCircle, Star, ArrowRight, Zap, Heart } from "lucide-react"
+import GoogleSignInButton from "@/components/GoogleSignInButton";
 
 export default function LandingPage() {
   const [currentTestimonial, setCurrentTestimonial] = useState(0)
@@ -35,26 +36,33 @@ export default function LandingPage() {
   const features = [
     {
       icon: Users,
-      title: "Buddy Match",
-      description: "Connect with like-minded peers who share your goals and learning style",
+      title: "Find your Growth Buddy",
+      description: "Because suffering alone is so 2020. Get matched with someone who actually gets it.",
       badge: "Free",
-      color: "bg-gradient-to-br from-[#CBD83B]/20 to-[#CBD83B]/5",
+      color: "bg-gradient-to-br from-primary/20 to-primary/5",
     },
     {
       icon: Target,
-      title: "Mentor Sessions",
-      description: "Get guidance from experienced professionals with structured check-ins",
+      title: "Mentor Match",
+      description: "Mentors who don’t sound like your dad. Real advice, real progress.",
       badge: "Premium",
-      color: "bg-gradient-to-br from-[#A88AED]/20 to-[#A88AED]/5",
+      color: "bg-gradient-to-br from-accent/20 to-accent/5",
     },
     {
       icon: MessageCircle,
       title: "Goal Tracking",
-      description: "AI-powered roadmaps and progress tracking to keep you on track",
+      description: "Set goals, track progress, and pretend you have it all together. (We won’t tell.)",
       badge: "AI-Powered",
-      color: "bg-gradient-to-br from-[#CBD83B]/10 to-[#A88AED]/10",
+      color: "bg-gradient-to-br from-primary/10 to-accent/10",
     },
-  ]
+    {
+      icon: Star,
+      title: "Swipe, Match, Meet",
+      description: "No awkward icebreakers. Just vibes, skills, and a little bit of chaos.",
+      badge: "Social",
+      color: "bg-gradient-to-br from-secondary/20 to-primary/10",
+    },
+  ];
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-[#FFFFEEC] via-white to-[#FFFFEEC]">
@@ -85,40 +93,29 @@ export default function LandingPage() {
       {/* Hero Section */}
       <section className="py-20 px-4">
         <div className="container mx-auto text-center max-w-4xl">
-          <Badge className="mb-6 bg-gradient-to-r from-[#CBD83B]/20 to-[#A88AED]/20 text-gray-700 border-0">
+          <Badge className="mb-6 bg-gradient-to-r from-primary/20 to-accent/20 text-gray-700 border-0">
             <Zap className="w-3 h-3 mr-1" />
             Connecting Students Worldwide
           </Badge>
           <h1 className="text-5xl md:text-7xl font-bold mb-6 bg-gradient-to-r from-gray-900 via-gray-800 to-gray-900 bg-clip-text text-transparent leading-tight">
-            Find Your Goal Partner,
-            <br />
-            <span className="bg-gradient-to-r from-[#CBD83B] to-[#A88AED] bg-clip-text text-transparent">
-              Get Mentored
-            </span>
-            ,<br />
-            Stay On Track
+            Lost? Confused? Want to delete LinkedIn every Monday? Same.
           </h1>
           <p className="text-xl text-gray-600 mb-8 max-w-2xl mx-auto leading-relaxed">
-            Connect with like-minded students and experienced mentors. Build accountability, stay motivated, and achieve
-            your goals together.
+            PeerUp is for the ambitious, the burnt-out, and everyone in between. Find your people, get real advice, and finally feel like you belong (even if you’re a little bit of a mess).
           </p>
-          <div className="flex flex-col sm:flex-row gap-4 justify-center">
+          <div className="flex flex-col sm:flex-row gap-4 justify-center mb-4">
             <Link href="/auth/signup">
               <Button
                 size="lg"
-                className="bg-[#CBD83B] hover:bg-[#CBD83B]/90 text-black font-medium px-8 py-6 text-lg rounded-2xl"
+                className="bg-primary hover:bg-primary/90 text-black font-medium px-8 py-6 text-lg rounded-2xl"
               >
                 Start Your Journey
                 <ArrowRight className="ml-2 w-5 h-5" />
               </Button>
             </Link>
-            <Button
-              size="lg"
-              variant="outline"
-              className="border-2 border-gray-200 hover:border-[#A88AED] px-8 py-6 text-lg rounded-2xl bg-transparent"
-            >
-              Watch Demo
-            </Button>
+          </div>
+          <div className="max-w-xs mx-auto">
+            <GoogleSignInButton />
           </div>
         </div>
       </section>
@@ -127,12 +124,12 @@ export default function LandingPage() {
       <section className="py-20 px-4 bg-white/50">
         <div className="container mx-auto max-w-6xl">
           <div className="text-center mb-16">
-            <h2 className="text-4xl font-bold mb-4 text-gray-900">Everything You Need to Succeed</h2>
+            <h2 className="text-4xl font-bold mb-4 text-gray-900">What’s Inside?</h2>
             <p className="text-xl text-gray-600 max-w-2xl mx-auto">
-              Our platform combines peer connection, expert mentorship, and AI-powered tracking
+              Not your average mentorship app. We’re here for the chaos, the growth, and the memes.
             </p>
           </div>
-          <div className="grid md:grid-cols-3 gap-8">
+          <div className="grid md:grid-cols-4 gap-8">
             {features.map((feature, index) => (
               <Card
                 key={index}
