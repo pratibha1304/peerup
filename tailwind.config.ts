@@ -12,6 +12,15 @@ const config: Config = {
   ],
   theme: {
   	extend: {
+      fontFamily: {
+        sans: ["Poppins", "ui-sans-serif", "system-ui", "sans-serif"],
+      },
+      colors: {
+        primary: "#85BCB1",
+        accent: "#2C6485",
+        background: "#D3E9D3",
+        secondary: "#645990",
+      },
   		colors: {
   			background: 'hsl(var(--background))',
   			foreground: 'hsl(var(--foreground))',
