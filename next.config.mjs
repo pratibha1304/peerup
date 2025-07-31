@@ -9,6 +9,9 @@ const nextConfig = {
   images: {
     unoptimized: true,
   },
+  // Netlify compatibility
+  output: 'standalone',
+  trailingSlash: true,
 }
 
 export default nextConfig
