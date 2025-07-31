@@ -1,7 +1,8 @@
 import NextAuth from 'next-auth';
 import CredentialsProvider from 'next-auth/providers/credentials';
-import clientPromise from '../../../lib/mongodb';
 import bcrypt from 'bcrypt';
+import { db } from '../../../lib/firebase';
+import { collection, query, where, getDocs } from 'firebase/firestore';
 
 export default NextAuth({
   providers: [
@@ -12,15 +13,21 @@ export default NextAuth({
         password: { label: "Password", type: "password" }
       },
       async authorize(credentials) {
-        const client = await clientPromise;
-        const db = client.db(process.env.MONGODB_DB);
-        const user = await db.collection('users').findOne({ username: credentials.username });
-
-        if (user && await bcrypt.compare(credentials.password, user.password)) {
-          const { password, ...userWithoutPass } = user;
-          return userWithoutPass;
+        const usersRef = collection(db, 'users');
+        const q = query(usersRef, where('username', '==', credentials.username));
+        const querySnapshot = await getDocs(q);
+        if (querySnapshot.empty) {
+          return null;
         }
-        return null;
+        const userDoc = querySnapshot.docs[0];
+        const user = userDoc.data();
+        const isValid = await bcrypt.compare(credentials.password, user.password);
+        if (!isValid) {
+          return null;
+        }
+        const { password, ...userWithoutPass } = user;
+        userWithoutPass.id = userDoc.id;
+        return userWithoutPass;
       }
     })
   ],
