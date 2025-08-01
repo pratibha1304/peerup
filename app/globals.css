@@ -1,0 +1,140 @@
+@import url('https://fonts.googleapis.com/css2?family=Lato:wght@300;400;700;900&family=Montserrat:wght@400;500;600;700;800;900&display=swap');
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body {
+  font-family: 'Lato', sans-serif;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: 'Montserrat', sans-serif;
+}
+
+/* Smooth dark mode transitions */
+* {
+  transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease;
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+}
+
+@layer base {
+  :root {
+    /* New PeerUp Color Scheme */
+    --peerup-primary: 133 24% 67%; /* #85BCB1 */
+    --peerup-accent: 207 51% 34%; /* #2C6485 */
+    --peerup-background: 120 25% 88%; /* #D3E9D3 */
+    --peerup-secondary: 260 25% 45%; /* #645990 */
+    
+    --background: 120 25% 88%;
+    --foreground: 207 51% 34%;
+    --card: 0 0% 100%;
+    --card-foreground: 207 51% 34%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 207 51% 34%;
+    --primary: 133 24% 67%;
+    --primary-foreground: 0 0% 98%;
+    --secondary: 260 25% 45%;
+    --secondary-foreground: 0 0% 98%;
+    --muted: 120 25% 88%;
+    --muted-foreground: 207 51% 34%;
+    --accent: 207 51% 34%;
+    --accent-foreground: 0 0% 98%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 133 24% 67%;
+    --input: 133 24% 67%;
+    --ring: 207 51% 34%;
+    --chart-1: 12 76% 61%;
+    --chart-2: 173 58% 39%;
+    --chart-3: 197 37% 24%;
+    --chart-4: 43 74% 66%;
+    --chart-5: 27 87% 67%;
+    --radius: 0.75rem;
+    --sidebar-background: 120 25% 88%;
+    --sidebar-foreground: 207 51% 34%;
+    --sidebar-primary: 133 24% 67%;
+    --sidebar-primary-foreground: 0 0% 98%;
+    --sidebar-accent: 260 25% 45%;
+    --sidebar-accent-foreground: 0 0% 98%;
+    --sidebar-border: 133 24% 67%;
+    --sidebar-ring: 207 51% 34%;
+  }
+  
+  .dark {
+    --background: 207 51% 34%;
+    --foreground: 120 25% 88%;
+    --card: 207 51% 34%;
+    --card-foreground: 120 25% 88%;
+    --popover: 207 51% 34%;
+    --popover-foreground: 120 25% 88%;
+    --primary: 133 24% 67%;
+    --primary-foreground: 207 51% 34%;
+    --secondary: 260 25% 45%;
+    --secondary-foreground: 120 25% 88%;
+    --muted: 207 51% 34%;
+    --muted-foreground: 133 24% 67%;
+    --accent: 133 24% 67%;
+    --accent-foreground: 207 51% 34%;
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 120 25% 88%;
+    --border: 133 24% 67%;
+    --input: 133 24% 67%;
+    --ring: 120 25% 88%;
+    --chart-1: 220 70% 50%;
+    --chart-2: 160 60% 45%;
+    --chart-3: 30 80% 55%;
+    --chart-4: 280 65% 60%;
+    --chart-5: 340 75% 55%;
+    --sidebar-background: 207 51% 34%;
+    --sidebar-foreground: 120 25% 88%;
+    --sidebar-primary: 133 24% 67%;
+    --sidebar-primary-foreground: 207 51% 34%;
+    --sidebar-accent: 260 25% 45%;
+    --sidebar-accent-foreground: 120 25% 88%;
+    --sidebar-border: 133 24% 67%;
+    --sidebar-ring: 120 25% 88%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+}
+
+/* Custom animations for micro-interactions */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.7;
+  }
+}
+
+.animate-fade-in-up {
+  animation: fadeInUp 0.6s ease-out;
+}
+
+.animate-pulse-slow {
+  animation: pulse 2s infinite;
+}
