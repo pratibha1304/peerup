@@ -1,7 +1,5 @@
 "use client";
 import { useEffect, useState, useRef } from "react";
-import { auth, db } from "@/lib/firebase";
-import { doc, getDoc, updateDoc } from "firebase/firestore";
 import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { User, Camera, Save, RefreshCw, AlertCircle, CheckCircle } from "lucide-react";
 
@@ -45,24 +43,7 @@ export default function ProfilePage() {
   useEffect(() => {
     const fetchProfile = async () => {
       try {
-        const user = auth.currentUser;
-        if (!user) return;
-        const userDoc = await getDoc(doc(db, "users", user.uid));
-        if (userDoc.exists()) {
-          const data = userDoc.data();
-          setProfile(data);
-          setName(data.name || "");
-          setRole(data.role || "");
-          setAge(data.age || "");
-          setLocation(data.location || "");
-          setLinkedin(data.linkedin || "");
-          setSkills(data.skills || []);
-          setInterests(data.interests || []);
-          setGoals(data.goals || "");
-          setAvailability(data.availability || []);
-          setInteraction(data.interaction || "");
-          setProfilePicUrl(data.profilePicUrl || "");
-        }
+        
       } catch (e) {
         setError("Failed to fetch profile.");
       } finally {
@@ -84,41 +65,9 @@ export default function ProfilePage() {
     setError("");
     setSuccess(false);
     try {
-      const user = auth.currentUser;
-      if (!user) throw new Error("No user found");
-
-      let newProfilePicUrl = profilePicUrl;
-      if (profilePic) {
-        const picRef = ref(storage, `profilePics/${user.uid}`);
-        await uploadBytes(picRef, profilePic);
-        newProfilePicUrl = await getDownloadURL(picRef);
-      }
-
-      const updateData: any = {
-        name,
-        role,
-        age,
-        location,
-        linkedin,
-        skills,
-        interests,
-        goals,
-        availability,
-        interaction,
-        profilePicUrl: newProfilePicUrl,
-        updatedAt: new Date().toISOString(),
-      };
-
-      // If role changed to mentor, set status to pending_review
-      if (role === "mentor" && profile?.role !== "mentor") {
-        updateData.status = "pending_review";
-      } else if (role !== "mentor" && profile?.role === "mentor") {
-        updateData.status = "active";
-      }
-
-      await updateDoc(doc(db, "users", user.uid), updateData);
+    
       setSuccess(true);
-      setProfilePicUrl(newProfilePicUrl);
+     
       setTimeout(() => setSuccess(false), 3000);
     } catch (err: any) {
       setError(err.message || "Failed to save profile");
