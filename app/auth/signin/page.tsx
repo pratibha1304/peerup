@@ -1,9 +1,7 @@
 "use client";
 import React, { useState } from "react";
 import { useRouter } from "next/navigation";
-import { auth } from "@/lib/firebase";
-import { signInWithEmailAndPassword } from "firebase/auth";
-import GoogleSignInButton from "@/components/GoogleSignInButton";
+import { useAuth } from "@/lib/auth-context";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -14,6 +12,7 @@ import Link from "next/link";
 
 export default function SigninPage() {
   const router = useRouter();
+  const { signIn } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
@@ -26,7 +25,7 @@ export default function SigninPage() {
     setError("");
     setSuccess(false);
     try {
-      await signInWithEmailAndPassword(auth, email, password);
+      await signIn(email, password);
       setSuccess(true);
       setTimeout(() => {
         router.push("/dashboard");
@@ -40,73 +39,60 @@ export default function SigninPage() {
 
   return (
     <div className="min-h-screen bg-background flex items-center justify-center p-4">
-      {/* Background decoration */}
-      <div className="absolute inset-0 overflow-hidden">
-        <div className="absolute -top-40 -right-40 w-80 h-80 bg-primary/10 rounded-full blur-3xl"></div>
-        <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-accent/10 rounded-full blur-3xl"></div>
-        <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-secondary/5 rounded-full blur-3xl"></div>
-      </div>
-
-      <div className="relative w-full max-w-md">
+      <div className="w-full max-w-md">
         {/* Header */}
         <div className="flex items-center justify-between mb-8">
           <Link href="/" className="flex items-center space-x-2 text-foreground hover:text-primary transition-colors">
             <ArrowLeft className="w-5 h-5" />
-            <span className="font-medium">Back to Home</span>
+            <span>Back to Home</span>
           </Link>
           <ThemeToggle />
         </div>
 
-        <Card className="border-0 shadow-2xl rounded-3xl overflow-hidden bg-card/80 backdrop-blur-sm">
+        {/* Sign In Card */}
+        <Card className="border-0 shadow-2xl rounded-3xl overflow-hidden">
           <CardContent className="p-8">
-            {/* Header */}
             <div className="text-center mb-8">
               <div className="w-16 h-16 bg-gradient-to-br from-primary to-accent rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg">
                 <Sparkles className="w-8 h-8 text-white" />
               </div>
-              <h1 className="text-3xl font-heading font-bold text-foreground mb-2">
-                Welcome Back!
-              </h1>
-              <p className="text-muted-foreground">
-                Ready to continue your journey? Let's get you signed in.
-              </p>
+              <h1 className="text-3xl font-bold text-foreground mb-2">Welcome Back</h1>
+              <p className="text-muted-foreground">Sign in to continue your journey</p>
             </div>
 
-            {/* Google Sign In */}
-            <div className="mb-8">
-              <GoogleSignInButton />
-              <div className="relative my-6">
-                <div className="absolute inset-0 flex items-center">
-                  <div className="w-full border-t border-muted-foreground/20"></div>
-                </div>
-                <div className="relative flex justify-center text-sm">
-                  <span className="px-4 bg-card text-muted-foreground">or continue with email</span>
-                </div>
+            {error && (
+              <div className="mb-4 p-3 bg-destructive/10 border border-destructive/20 rounded-lg text-destructive text-sm">
+                {error}
               </div>
-            </div>
+            )}
 
-            {/* Form */}
+            {success && (
+              <div className="mb-4 p-3 bg-green-500/10 border border-green-500/20 rounded-lg text-green-600 text-sm">
+                Sign in successful! Redirecting to dashboard...
+              </div>
+            )}
+
             <form onSubmit={handleSignin} className="space-y-6">
               <div className="space-y-2">
-                <Label htmlFor="email" className="text-foreground font-medium">
-                  Email Address
+                <Label htmlFor="email" className="text-sm font-medium">
+                  Email
                 </Label>
                 <div className="relative">
                   <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-muted-foreground" />
                   <Input
                     id="email"
                     type="email"
+                    placeholder="Enter your email"
                     value={email}
-                    onChange={e => setEmail(e.target.value)}
+                    onChange={(e) => setEmail(e.target.value)}
+                    className="pl-10"
                     required
-                    className="pl-10 h-12 rounded-xl border-primary/20 focus:border-primary transition-colors"
-                    placeholder="you@example.com"
                   />
                 </div>
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="password" className="text-foreground font-medium">
+                <Label htmlFor="password" className="text-sm font-medium">
                   Password
                 </Label>
                 <div className="relative">
@@ -114,43 +100,37 @@ export default function SigninPage() {
                   <Input
                     id="password"
                     type="password"
-                    value={password}
-                    onChange={e => setPassword(e.target.value)}
-                    required
-                    className="pl-10 h-12 rounded-xl border-primary/20 focus:border-primary transition-colors"
                     placeholder="Enter your password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    className="pl-10"
+                    required
                   />
                 </div>
               </div>
 
-              {error && (
-                <div className="p-4 bg-destructive/10 border border-destructive/20 rounded-xl text-destructive text-sm">
-                  {error}
-                </div>
-              )}
-
-              {success && (
-                <div className="p-4 bg-primary/10 border border-primary/20 rounded-xl text-primary text-sm font-medium">
-                  Sign in successful! Redirecting to your dashboard...
-                </div>
-              )}
-
               <Button
                 type="submit"
-                className="w-full h-12 bg-primary hover:bg-primary/90 text-primary-foreground font-medium rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-0.5"
+                className="w-full bg-primary hover:bg-primary/90 text-primary-foreground font-medium py-3 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300"
                 disabled={loading}
               >
                 {loading ? "Signing in..." : "Sign In"}
               </Button>
             </form>
 
-            {/* Footer */}
-            <div className="mt-8 text-center">
-              <p className="text-muted-foreground">
+            <div className="mt-6 text-center">
+              <p className="text-muted-foreground text-sm">
                 Don't have an account?{" "}
-                <Link href="/auth/signup" className="text-primary hover:text-primary/80 font-medium transition-colors">
-                  Sign up here
+                <Link href="/auth/signup" className="text-primary hover:text-primary/80 font-medium">
+                  Sign up
                 </Link>
+              </p>
+            </div>
+
+            {/* Demo Note */}
+            <div className="mt-6 p-3 bg-blue-500/10 border border-blue-500/20 rounded-lg">
+              <p className="text-blue-600 text-xs text-center">
+                💡 Demo Mode: Any email/password combination will work
               </p>
             </div>
           </CardContent>

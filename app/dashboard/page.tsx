@@ -1,38 +1,20 @@
 "use client";
-import { useEffect, useState } from "react";
-import { auth, db } from "@/lib/firebase";
-import { doc, getDoc } from "firebase/firestore";
+import { useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { useAuth } from "@/lib/auth-context";
 import { Sparkles, TrendingUp, Users, Calendar, Star, Bot, AlertCircle } from "lucide-react";
 
 export default function DashboardPage() {
-  const [profile, setProfile] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
+  const { user, loading } = useAuth();
+  const router = useRouter();
 
   useEffect(() => {
-    const fetchProfile = async () => {
-      setLoading(true);
-      setError("");
-      try {
-        const user = auth.currentUser;
-        if (!user) return;
-        const userDoc = await getDoc(doc(db, "users", user.uid));
-        if (!userDoc.exists()) {
-          setError("Profile not found.");
-          setLoading(false);
-          return;
-        }
-        setProfile(userDoc.data());
-      } catch (e) {
-        setError("Failed to fetch profile.");
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchProfile();
-  }, []);
+    if (!loading && !user) {
+      router.push("/auth/signin");
+    }
+  }, [user, loading, router]);
 
-  if (loading) {
+  if (loading || !user) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-lg">Loading your chaos...</div>
@@ -40,57 +22,25 @@ export default function DashboardPage() {
     );
   }
 
-  if (error) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="text-red-500">{error}</div>
-      </div>
-    );
-  }
-
-  if (!profile) {
-    return null;
-  }
-
   // Profile completeness check
   const requiredFields = ["name", "role", "goals", "skills", "interests", "availability"];
   const incompleteFields = requiredFields.filter(
-    (field) => !profile?.[field] || (Array.isArray(profile[field]) && profile[field].length === 0)
+    (field) => !user?.[field] || (Array.isArray(user[field]) && user[field].length === 0)
   );
   const isProfileIncomplete = incompleteFields.length > 0;
 
-  // Role-based stats
-  const getStats = () => {
-    const baseStats = [
-      { label: "Matches", value: 3, icon: Users },
-      { label: "Sessions", value: 2, icon: Calendar },
-      { label: "Peer Rating", value: "4.8/5", icon: Star },
-      { label: "Goals", value: profile?.goals ? 1 : 0, icon: TrendingUp },
-    ];
+  // Fake stats for demo
+  const stats = [
+    { label: "Matches", value: 3, icon: Users },
+    { label: "Goals Tracked", value: 5, icon: TrendingUp },
+    { label: "Sessions", value: 12, icon: Calendar },
+    { label: "Achievements", value: 2, icon: Star },
+    { label: "AI Chats", value: 7, icon: Bot },
+    { label: "Streak", value: "4d", icon: TrendingUp },
+  ];
 
-    if (profile.role === "mentor") {
-      return [
-        ...baseStats,
-        { label: "Mentees", value: 5, icon: Users },
-        { label: "Earnings", value: "₹2,400", icon: TrendingUp },
-      ];
-    } else if (profile.role === "buddy") {
-      return [
-        ...baseStats,
-        { label: "Buddies", value: 2, icon: Users },
-      ];
-    } else {
-      return [
-        ...baseStats,
-        { label: "Mentors", value: 1, icon: Users },
-      ];
-    }
-  };
-
-  const stats = getStats();
-
-  // Fake goal progress for demo
-  const goalProgress = 60; // percent
+  // Fake goal progress
+  const goalProgress = 70; // percent
   const badge = goalProgress >= 80 ? "Crushing it!" : goalProgress >= 50 ? "Keep going!" : "Just getting started";
 
   return (
@@ -107,7 +57,7 @@ export default function DashboardPage() {
       )}
 
       {/* Mentor Review Notice */}
-      {profile.role === "mentor" && profile.status === "pending_review" && (
+      {user.role === "mentor" && user.status === "pending_review" && (
         <div className="mb-6 p-4 rounded-xl text-sm font-semibold bg-[#645990] text-white">
           Mentor application under review. Sit tight, we're deciding if you're cool enough.
         </div>
@@ -116,7 +66,7 @@ export default function DashboardPage() {
       {/* Greeting */}
       <div className="mb-8">
         <h1 className="text-4xl font-extrabold mb-2 text-[#645990] dark:text-[#85BCB1]">
-          Hey {profile?.name || "there"}, welcome to the chaos.
+          Hey {user?.name || "there"}, welcome to the chaos.
         </h1>
         <p className="text-lg text-gray-700 dark:text-gray-200">
           Here's your dashboard. Try not to break anything.
@@ -138,32 +88,30 @@ export default function DashboardPage() {
       <div className="mb-8 bg-white dark:bg-[#23272f] rounded-xl p-6 shadow">
         <div className="flex flex-col md:flex-row items-center gap-6">
           <div className="flex-1">
-            <div className="text-lg font-semibold text-[#2C6485] dark:text-[#85BCB1] mb-2">Goal Progress</div>
-            <div className="w-full bg-gray-200 rounded-full h-4 mb-2">
+            <div className="text-lg font-semibold mb-2">Goal Progress</div>
+            <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-4 mb-2">
               <div
-                className="h-4 rounded-full bg-gradient-to-r from-[#85BCB1] to-[#645990] transition-all"
+                className="bg-gradient-to-r from-[#85BCB1] to-[#645990] h-4 rounded-full transition-all duration-500"
                 style={{ width: `${goalProgress}%` }}
               />
             </div>
-            <div className="text-sm text-gray-600 dark:text-gray-200">{profile?.goals || "No goals set yet. Set one to get started!"}</div>
-          </div>
-          <div className="flex flex-col items-center">
-            <Sparkles className="w-10 h-10 text-[#645990] dark:text-[#85BCB1] mb-2" />
-            <span className="font-bold text-[#645990] dark:text-[#85BCB1] text-lg">{badge}</span>
+            <div className="text-sm text-gray-600 dark:text-gray-300">{goalProgress}% complete - {badge}</div>
           </div>
         </div>
       </div>
 
-      {/* AI Roadmap Placeholder */}
+      {/* Profile Details */}
       <div className="bg-white dark:bg-[#23272f] rounded-xl p-6 shadow">
-        <div className="flex items-center gap-4">
-          <Bot className="w-8 h-8 text-[#85BCB1] dark:text-[#645990]" />
-          <div>
-            <div className="font-semibold text-[#2C6485] dark:text-[#85BCB1] mb-1">AI Roadmap</div>
-            <div className="text-gray-700 dark:text-gray-200 text-sm">
-              Your personalized roadmap will appear here soon. (Gemini AI integration coming!)
-            </div>
-          </div>
+        <div className="text-lg font-semibold mb-4">Your Profile</div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div><span className="font-medium">Name:</span> {user.name}</div>
+          <div><span className="font-medium">Email:</span> {user.email}</div>
+          <div><span className="font-medium">Role:</span> {user.role}</div>
+          <div><span className="font-medium">Location:</span> {user.location || "-"}</div>
+          <div><span className="font-medium">Skills:</span> {user.skills?.join(", ") || "-"}</div>
+          <div><span className="font-medium">Interests:</span> {user.interests?.join(", ") || "-"}</div>
+          <div><span className="font-medium">Goals:</span> {user.goals || "-"}</div>
+          <div><span className="font-medium">Availability:</span> {user.availability?.join(", ") || "-"}</div>
         </div>
       </div>
     </div>
