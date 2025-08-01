@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { auth, db, GoogleAuthProvider } from "@/lib/firebase";
 import { signInWithPopup } from "firebase/auth";
 import { doc, getDoc, setDoc } from "firebase/firestore";
+import { Button } from "@/components/ui/button";
 
 export default function GoogleSignInButton() {
   const [loading, setLoading] = useState(false);
@@ -67,11 +68,11 @@ export default function GoogleSignInButton() {
 
   return (
     <div className="w-full flex flex-col items-center">
-      <button
+      <Button
         onClick={handleGoogleSignIn}
         disabled={loading}
-        className="w-full flex items-center justify-center gap-3 py-2 px-4 rounded-lg border border-gray-300 bg-white text-gray-700 font-semibold shadow hover:bg-gray-50 transition disabled:opacity-60"
-        style={{ fontFamily: 'Poppins, sans-serif' }}
+        variant="outline"
+        className="w-full h-12 flex items-center justify-center gap-3 bg-white hover:bg-gray-50 text-foreground border-border hover:border-primary/40 transition-all duration-300 font-medium rounded-xl shadow-sm hover:shadow-md"
       >
         <svg width="20" height="20" viewBox="0 0 48 48" className="inline-block">
           <g>
@@ -83,8 +84,12 @@ export default function GoogleSignInButton() {
           </g>
         </svg>
         {loading ? "Signing you in..." : "Sign in with Google"}
-      </button>
-      {error && <div className="text-red-500 text-sm mt-2">{error}</div>}
+      </Button>
+      {error && (
+        <div className="text-destructive text-sm mt-2 text-center">
+          {error}
+        </div>
+      )}
     </div>
   );
 }

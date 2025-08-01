@@ -13,7 +13,8 @@ const config: Config = {
   theme: {
   	extend: {
       fontFamily: {
-        sans: ["Poppins", "ui-sans-serif", "system-ui", "sans-serif"],
+        sans: ["Lato", "ui-sans-serif", "system-ui", "sans-serif"],
+        heading: ["Montserrat", "ui-sans-serif", "system-ui", "sans-serif"],
       },
       colors: {
         primary: "#85BCB1",
