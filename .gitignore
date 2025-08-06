@@ -6,7 +6,7 @@
 # next.js
 /.next/
 /out/
-
+/lib/firebase.js
 # production
 /build
 
