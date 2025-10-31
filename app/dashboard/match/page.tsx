@@ -1,141 +1,90 @@
 "use client";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { auth, db } from "@/lib/firebase";
-import { doc, getDoc, collection, getDocs } from "firebase/firestore";
-import { Users, Filter, Search, Star, MapPin, Calendar, MessageCircle, RefreshCw, User } from "lucide-react";
+import { useAuth } from "@/lib/auth-context";
+import { initiateCall, getPartnershipId } from "@/lib/calling";
+import { Users, Filter, Search, Star, MapPin, Calendar, MessageCircle, RefreshCw, User, Heart, Sparkles, Phone, Video, Send, Inbox } from "lucide-react";
+import { sendMatchRequest, listenOutgoingRequests, listenIncomingRequests, MatchRequest } from '@/lib/matchRequests'
 
 const SKILLS_LIST = [
   "javascript", "python", "java", "c++", "react", "node.js", "express", "mongodb", "sql", "typescript", "html", "css", "ui/ux", "design", "marketing", "business", "data science", "machine learning", "ai", "cloud", "aws", "azure", "gcp", "devops", "docker", "kubernetes", "git", "figma", "photoshop", "illustrator", "writing", "public speaking", "photography", "music", "finance", "accounting", "product management", "project management", "leadership", "teamwork", "problem solving", "critical thinking", "communication", "sales", "content creation", "seo", "social media", "video editing", "animation", "cybersecurity", "blockchain", "solidity", "flutter", "android", "ios", "swift", "kotlin", "go", "ruby", "php", "laravel", "django", "flask", "r", "matlab", "statistics", "research", "biology", "chemistry", "physics", "mathematics", "economics", "psychology", "education", "teaching", "coaching", "mentoring", "sports", "fitness", "yoga", "meditation", "health", "nutrition", "cooking", "baking", "languages", "french", "spanish", "german", "hindi", "chinese", "japanese", "korean", "arabic", "travel", "gaming", "esports", "volunteering", "sustainability", "environment", "robotics", "electronics", "hardware", "networking", "testing", "qa", "customer support", "hr", "recruitment", "legal", "law", "medicine", "nursing", "veterinary", "architecture", "interior design", "fashion", "event planning", "journalism", "blogging", "podcasting", "comedy", "acting", "film", "theatre", "dance", "painting", "sculpture", "calligraphy", "crafts", "diy", "gardening", "parenting", "pets", "astrology", "spirituality", "philosophy", "history", "politics", "international relations"
 ];
 
-// Simple matching function
-function calculateMatchScore(user: any, candidate: any) {
-  let score = 0;
-  
-  // Skills matching (3 points per matching skill)
-  const userSkills = (user.skills || []).map((s: string) => s.toLowerCase());
-  const candidateSkills = (candidate.skills || []).map((s: string) => s.toLowerCase());
-  userSkills.forEach((skill: string) => {
-    if (candidateSkills.includes(skill)) score += 3;
-  });
-  
-  // Interests matching (2 points per matching interest)
-  const userInterests = (user.interests || []).map((i: string) => i.toLowerCase());
-  const candidateInterests = (candidate.interests || []).map((i: string) => i.toLowerCase());
-  userInterests.forEach((interest: string) => {
-    if (candidateInterests.includes(interest)) score += 2;
-  });
-  
-  // Availability matching (1 point per matching availability)
-  const userAvail = (user.availability || []).map((a: string) => a.toLowerCase());
-  const candidateAvail = (candidate.availability || []).map((a: string) => a.toLowerCase());
-  userAvail.forEach((avail: string) => {
-    if (candidateAvail.includes(avail)) score += 1;
-  });
-  
-  // Base score for any valid candidate
-  if (score === 0) score = 1;
-  
-  return score;
+interface MatchResult {
+  user: any;
+  score: number;
+  reasons: string[];
+  compatibility: {
+    skills: number;
+    interests: number;
+    goals: number;
+    availability: number;
+    location: number;
+  };
 }
 
 export default function MatchPage() {
-  const [matches, setMatches] = useState<any[]>([]);
+  const [matches, setMatches] = useState<MatchResult[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [profile, setProfile] = useState<any>(null);
   const [showFilters, setShowFilters] = useState(false);
   const [selectedSkills, setSelectedSkills] = useState<string[]>([]);
   const [selectedInterests, setSelectedInterests] = useState<string[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
+  const [lastRefresh, setLastRefresh] = useState<Date>(new Date());
+  const [outgoing, setOutgoing] = useState<MatchRequest[]>([])
+  const [incoming, setIncoming] = useState<MatchRequest[]>([])
+  
+  const { user } = useAuth();
   const router = useRouter();
 
   useEffect(() => {
-    const fetchProfileAndMatches = async () => {
-      setLoading(true);
-      setError("");
-      try {
-        const user = auth.currentUser;
-        if (!user) {
-          router.push("/auth/signin");
-          return;
-        }
+    if (user) {
+      fetchMatches();
+    }
+  }, [user]);
 
-        // Get current user profile
-        const userDoc = await getDoc(doc(db, "users", user.uid));
-        if (!userDoc.exists()) {
-          setError("Profile not found. Please complete your profile first.");
-          setLoading(false);
-          return;
-        }
+  // listen to requests
+  useEffect(() => {
+    if (!user) return
+    const unsubOut = listenOutgoingRequests(user.uid, setOutgoing)
+    const unsubIn = listenIncomingRequests(user.uid, setIncoming)
+    return () => {
+      unsubOut()
+      unsubIn()
+    }
+  }, [user])
 
-        const userProfile = userDoc.data();
-        setProfile(userProfile);
-        
-        console.log("Current user profile:", userProfile);
-
-        // Get all users from Firestore
-        const usersSnapshot = await getDocs(collection(db, "users"));
-        const allUsers = usersSnapshot.docs.map(doc => doc.data());
-        
-        console.log("Total users in database:", allUsers.length);
-
-        // Filter available users (exclude current user and pending reviews)
-        const availableUsers = allUsers.filter((u: any) => 
-          u.uid !== userProfile.uid && 
-          u.status !== 'pending_review' && 
-          u.role && 
-          u.skills && 
-          u.skills.length > 0
-        );
-        
-        console.log("Available users:", availableUsers.length);
-
-        // Role-based matching
-        let candidates;
-        if (userProfile.role === 'buddy') {
-          candidates = availableUsers.filter((u: any) => u.role === 'buddy');
-        } else if (userProfile.role === 'mentor') {
-          candidates = availableUsers.filter((u: any) => u.role === 'mentee');
-        } else if (userProfile.role === 'mentee') {
-          candidates = availableUsers.filter((u: any) => u.role === 'mentor');
-        } else {
-          // If no role specified, show all available users
-          candidates = availableUsers;
-        }
-
-        // Fallback: if no role-specific matches, show all available users
-        if (candidates.length === 0) {
-          console.log("No role-specific matches, showing all available users");
-          candidates = availableUsers;
-        }
-
-        console.log("Candidates found:", candidates.length);
-
-        // Calculate match scores and sort
-        const scoredMatches = candidates
-          .map((candidate: any) => ({
-            user: candidate,
-            score: calculateMatchScore(userProfile, candidate)
-          }))
-          .sort((a: any, b: any) => b.score - a.score)
-          .slice(0, 20); // Top 20 matches
-
-        console.log("Final matches:", scoredMatches.length);
-        console.log("Match scores:", scoredMatches.map((m: any) => ({ name: m.user.name, score: m.score })));
-
-        setMatches(scoredMatches);
-      } catch (err: any) {
-        console.error("Match error:", err);
-        setError(err.message || "Failed to fetch matches");
-      } finally {
-        setLoading(false);
+  const fetchMatches = async () => {
+    if (!user) return;
+    
+    setLoading(true);
+    setError("");
+    
+    try {
+      // Directly import and call matching functions from client-side
+      const { findBuddyMatches, findMentorMatches, findMenteeMatches } = await import('@/lib/matching-engine');
+      
+      let matches;
+      if (user.role === 'buddy') {
+        matches = await findBuddyMatches(user);
+      } else if (user.role === 'mentor') {
+        matches = await findMenteeMatches(user);
+      } else if (user.role === 'mentee') {
+        matches = await findMentorMatches(user);
+      } else {
+        matches = await findBuddyMatches(user);
       }
-    };
-
-    fetchProfileAndMatches();
-  }, [router]);
+      
+      setMatches(matches || []);
+      setLastRefresh(new Date());
+    } catch (err: any) {
+      console.error("Match error:", err);
+      setError(err.message || "Failed to fetch matches");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const toggleMultiSelect = (value: string, arr: string[], setArr: (a: string[]) => void, max: number) => {
     if (arr.includes(value)) {
@@ -145,50 +94,62 @@ export default function MatchPage() {
     }
   };
 
-  const filteredMatches = matches.filter((match: any) => {
+  const filteredMatches = matches.filter((match) => {
     const user = match.user;
     const matchesSearch = user.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          user.skills?.some((skill: string) => skill.toLowerCase().includes(searchTerm.toLowerCase())) ||
-                         user.interests?.some((interest: string) => interest.toLowerCase().includes(searchTerm.toLowerCase()));
+                         user.interests?.some((interest: string) => interest.toLowerCase().includes(searchTerm.toLowerCase())) ||
+                         user.location?.toLowerCase().includes(searchTerm.toLowerCase());
     
     const matchesSkills = selectedSkills.length === 0 || 
                          selectedSkills.some(skill => user.skills?.includes(skill));
     
     const matchesInterests = selectedInterests.length === 0 || 
-                            selectedInterests.some(interest => user.interests?.includes(interest));
-
+                           selectedInterests.some(interest => user.interests?.includes(interest));
+    
     return matchesSearch && matchesSkills && matchesInterests;
   });
 
-  const getMatchType = () => {
-    if (!profile) return "";
-    if (profile.role === "buddy") return "Buddy";
-    if (profile.role === "mentor") return "Mentee";
-    if (profile.role === "mentee") return "Mentor";
-    return "Match";
+  const getMatchTypeTitle = () => {
+    if (!user) return "Find Your Match";
+    
+    switch (user.role) {
+      case 'buddy':
+        return "Find Your Study Buddy";
+      case 'mentor':
+        return "Find Your Mentee";
+      case 'mentee':
+        return "Find Your Mentor";
+      default:
+        return "Find Your Match";
+    }
   };
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="text-center">
-          <RefreshCw className="w-8 h-8 animate-spin mx-auto mb-4 text-[#85BCB1]" />
-          <div className="text-lg">Finding your perfect match...</div>
-        </div>
-      </div>
-    );
-  }
+  const getMatchTypeDescription = () => {
+    if (!user) return "Discover amazing people to connect with";
+    
+    switch (user.role) {
+      case 'buddy':
+        return "Connect with like-minded peers who share your goals and interests";
+      case 'mentor':
+        return "Find eager learners who can benefit from your expertise";
+      case 'mentee':
+        return "Connect with experienced mentors who can guide your journey";
+      default:
+        return "Discover amazing people to connect with";
+    }
+  };
 
-  if (error) {
+  if (!user) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
+      <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-pear-50 flex items-center justify-center">
         <div className="text-center">
-          <div className="text-red-500 mb-4">{error}</div>
+          <h2 className="text-2xl font-bold text-gray-900 mb-4">Please sign in to view matches</h2>
           <button 
-            onClick={() => window.location.reload()}
-            className="px-4 py-2 bg-[#85BCB1] text-white rounded-lg hover:bg-[#645990] transition"
+            onClick={() => router.push('/auth/signin')}
+            className="bg-pear text-black px-6 py-3 rounded-xl font-medium hover:bg-pear/90 transition-colors"
           >
-            Try Again
+            Sign In
           </button>
         </div>
       </div>
@@ -196,235 +157,317 @@ export default function MatchPage() {
   }
 
   return (
-    <div className="w-full max-w-6xl mx-auto">
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-[#645990] dark:text-[#85BCB1] mb-2">
-          Find {getMatchType()}
-        </h1>
-        <p className="text-gray-600 dark:text-gray-300">
-          Discover amazing people who share your interests and goals.
-        </p>
-        {profile && (
-          <p className="text-sm text-gray-500 dark:text-gray-400 mt-2">
-            Your role: <span className="font-semibold">{profile.role}</span> | 
-            Your skills: <span className="font-semibold">{profile.skills?.length || 0}</span> skills |
-            Found: <span className="font-semibold">{matches.length}</span> potential matches
+    <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-pear-50">
+      <div className="container mx-auto px-4 py-8">
+        {/* Header */}
+        <div className="text-center mb-8">
+          <div className="flex items-center justify-center mb-4">
+            <Sparkles className="w-8 h-8 text-indigo-500 mr-3" />
+            <h1 className="text-4xl font-bold bg-gradient-to-r from-indigo-600 to-pear-500 bg-clip-text text-transparent">
+              {getMatchTypeTitle()}
+            </h1>
+          </div>
+          <p className="text-gray-600 text-lg max-w-2xl mx-auto">
+            {getMatchTypeDescription()}
           </p>
-        )}
-      </div>
+        </div>
 
-      {/* Search and Filters UI */}
-      <div className="bg-white dark:bg-[#23272f] rounded-xl p-6 shadow mb-6">
-        <div className="flex flex-col md:flex-row gap-4">
-          <div className="flex-1">
+        {/* Stats and Controls */}
+        <div className="bg-white rounded-2xl shadow-lg p-6 mb-8">
+          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+            <div className="flex items-center gap-6">
+              <div className="flex items-center gap-2">
+                <Users className="w-5 h-5 text-indigo-500" />
+                <span className="text-gray-600">
+                  {filteredMatches.length} {user.role === 'buddy' ? 'buddies' : user.role === 'mentor' ? 'mentees' : 'mentors'} found
+                </span>
+              </div>
+              <div className="flex items-center gap-2">
+                <RefreshCw className="w-4 h-4 text-gray-400" />
+                <span className="text-sm text-gray-500">
+                  Last updated: {lastRefresh.toLocaleTimeString()}
+                </span>
+              </div>
+            </div>
+            
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => setShowFilters(!showFilters)}
+                className="flex items-center gap-2 px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-xl transition-colors"
+              >
+                <Filter className="w-4 h-4" />
+                Filters
+              </button>
+              <button
+                onClick={fetchMatches}
+                disabled={loading}
+                className="flex items-center gap-2 px-4 py-2 bg-pear hover:bg-pear/90 text-black rounded-xl transition-colors disabled:opacity-50"
+              >
+                <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+                Refresh
+              </button>
+            <button
+              onClick={() => router.push('/dashboard/match/requests')}
+              className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl transition-colors"
+              title="Incoming requests"
+            >
+              <Inbox className="w-4 h-4" />
+              Requests ({incoming.filter(r => r.status === 'pending').length})
+            </button>
+            </div>
+          </div>
+
+          {/* Search Bar */}
+          <div className="mt-4">
             <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
               <input
                 type="text"
-                placeholder="Search by name, skills, or interests..."
+                placeholder="Search by name, skills, interests, or location..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-[#85BCB1] focus:border-transparent"
+                className="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
               />
             </div>
           </div>
-          <button
-            onClick={() => setShowFilters(!showFilters)}
-            className="flex items-center gap-2 px-4 py-2 bg-[#85BCB1] text-white rounded-lg hover:bg-[#645990] transition"
-          >
-            <Filter className="w-4 h-4" />
-            Filters
-          </button>
-        </div>
 
-        {showFilters && (
-          <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
-            {/* Skills Filter */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                Skills ({selectedSkills.length}/5)
-              </label>
-              <div className="flex flex-wrap gap-2">
-                {SKILLS_LIST.slice(0, 10).map((skill) => (
-                  <button
-                    key={skill}
-                    onClick={() => toggleMultiSelect(skill, selectedSkills, setSelectedSkills, 5)}
-                    className={`px-3 py-1 rounded-full text-xs font-medium transition ${
-                      selectedSkills.includes(skill)
-                        ? "bg-[#645990] text-white"
-                        : "bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600"
-                    }`}
-                  >
-                    {skill}
-                  </button>
-                ))}
+          {/* Filters */}
+          {showFilters && (
+            <div className="mt-6 pt-6 border-t border-gray-200">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Skills ({selectedSkills.length}/5)
+                  </label>
+                  <div className="flex flex-wrap gap-2">
+                    {SKILLS_LIST.slice(0, 20).map((skill) => (
+                      <button
+                        key={skill}
+                        onClick={() => toggleMultiSelect(skill, selectedSkills, setSelectedSkills, 5)}
+                        className={`px-3 py-1 rounded-full text-sm transition-colors ${
+                          selectedSkills.includes(skill)
+                            ? 'bg-indigo-500 text-white'
+                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                        }`}
+                      >
+                        {skill}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Interests ({selectedInterests.length}/5)
+                  </label>
+                  <div className="flex flex-wrap gap-2">
+                    {['web development', 'mobile development', 'data science', 'machine learning', 'startups', 'design', 'gaming', 'music', 'sports', 'travel'].map((interest) => (
+                      <button
+                        key={interest}
+                        onClick={() => toggleMultiSelect(interest, selectedInterests, setSelectedInterests, 5)}
+                        className={`px-3 py-1 rounded-full text-sm transition-colors ${
+                          selectedInterests.includes(interest)
+                            ? 'bg-pear text-black'
+                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                        }`}
+                      >
+                        {interest}
+                      </button>
+                    ))}
+                  </div>
+                </div>
               </div>
             </div>
+          )}
+        </div>
 
-            {/* Interests Filter */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                Interests ({selectedInterests.length}/5)
-              </label>
-              <div className="flex flex-wrap gap-2">
-                {SKILLS_LIST.slice(10, 20).map((interest) => (
-                  <button
-                    key={interest}
-                    onClick={() => toggleMultiSelect(interest, selectedInterests, setSelectedInterests, 5)}
-                    className={`px-3 py-1 rounded-full text-xs font-medium transition ${
-                      selectedInterests.includes(interest)
-                        ? "bg-[#645990] text-white"
-                        : "bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600"
-                    }`}
-                  >
-                    {interest}
-                  </button>
-                ))}
+        {/* Loading State */}
+        {loading && (
+          <div className="text-center py-12">
+            <div className="inline-flex items-center gap-3">
+              <RefreshCw className="w-6 h-6 animate-spin text-indigo-500" />
+              <span className="text-gray-600">Finding your perfect matches...</span>
+            </div>
+          </div>
+        )}
+
+        {/* Error State */}
+        {error && (
+          <div className="bg-red-50 border border-red-200 rounded-xl p-6 mb-8">
+            <div className="flex items-center gap-3">
+              <div className="w-6 h-6 bg-red-500 rounded-full flex items-center justify-center">
+                <span className="text-white text-sm">!</span>
+              </div>
+              <div>
+                <h3 className="font-medium text-red-800">Error loading matches</h3>
+                <p className="text-red-600 text-sm">{error}</p>
               </div>
             </div>
           </div>
         )}
-      </div>
 
-      {/* Results */}
-      {filteredMatches.length === 0 ? (
-        <div className="bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-8 text-center">
-          <Users className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-          <h3 className="text-lg font-semibold text-gray-700 dark:text-gray-300 mb-2">
-            No matches found
-          </h3>
-          <p className="text-gray-500 dark:text-gray-400 mb-4">
-            {profile?.role === 'mentor' 
-              ? "No mentees available right now. Check back later or try adjusting your filters."
-              : profile?.role === 'mentee'
-              ? "No mentors available right now. Check back later or try adjusting your filters."
-              : "No buddies available right now. Check back later or try adjusting your filters."
-            }
-          </p>
-          <div className="text-sm text-gray-400">
-            <p>Make sure your profile is complete with skills and interests.</p>
-            <p>Try removing some filters to see more results.</p>
-          </div>
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredMatches.map((match: any, index: number) => (
-            <div key={match.user.uid} className="bg-white dark:bg-[#23272f] rounded-xl p-6 shadow hover:shadow-lg transition">
-              <div className="flex items-start gap-4 mb-4">
-                <div className="w-16 h-16 rounded-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center overflow-hidden">
-                  {match.user.profilePicUrl ? (
-                    <img
-                      src={match.user.profilePicUrl}
-                      alt={match.user.name}
-                      className="w-full h-full object-cover"
-                    />
-                  ) : (
-                    <User className="w-8 h-8 text-gray-400" />
-                  )}
-                </div>
-                <div className="flex-1">
-                  <h3 className="font-semibold text-gray-900 dark:text-white mb-1">
-                    {match.user.name}
-                  </h3>
-                  <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400 mb-2">
-                    <span className="capitalize bg-[#85BCB1] text-white px-2 py-1 rounded-full text-xs">
-                      {match.user.role}
-                    </span>
-                    {match.user.location && (
-                      <>
-                        <MapPin className="w-3 h-3" />
-                        <span>{match.user.location}</span>
-                      </>
-                    )}
+        {/* Matches Grid */}
+        {!loading && !error && (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {filteredMatches.map((match, index) => (
+              <div
+                key={match.user.uid}
+                className="bg-white rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 overflow-hidden group"
+              >
+                {/* Match Score Badge */}
+                <div className="relative">
+                  <div className="absolute top-4 right-4 z-10">
+                    <div className="bg-gradient-to-r from-indigo-500 to-pear-400 text-white px-3 py-1 rounded-full text-sm font-medium flex items-center gap-1">
+                      <Heart className="w-3 h-3" />
+                      {match.score}%
+                    </div>
                   </div>
-                  <div className="flex items-center gap-1 text-yellow-500">
-                    {[...Array(5)].map((_, i) => (
-                      <Star
-                        key={i}
-                        className={`w-3 h-3 ${i < 4 ? "fill-current" : ""}`}
+                  
+                  {/* Profile Image */}
+                  <div className="h-48 bg-gradient-to-br from-indigo-100 to-pear-100 flex items-center justify-center">
+                    {match.user.profilePicUrl ? (
+                      <img
+                        src={match.user.profilePicUrl}
+                        alt={match.user.name}
+                        className="w-24 h-24 rounded-full object-cover"
                       />
-                    ))}
-                    <span className="text-xs text-gray-500 dark:text-gray-400 ml-1">4.5</span>
-                  </div>
-                </div>
-                <div className="text-right">
-                  <div className="text-sm font-semibold text-[#645990] dark:text-[#85BCB1]">
-                    {match.score} pts
-                  </div>
-                </div>
-              </div>
-
-              {match.user.goals && (
-                <div className="mb-4">
-                  <div className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                    Goals
-                  </div>
-                  <div className="text-sm text-gray-600 dark:text-gray-400 line-clamp-2">
-                    {match.user.goals}
-                  </div>
-                </div>
-              )}
-
-              {match.user.skills && match.user.skills.length > 0 && (
-                <div className="mb-4">
-                  <div className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    Skills
-                  </div>
-                  <div className="flex flex-wrap gap-1">
-                    {match.user.skills.slice(0, 3).map((skill: string) => (
-                      <span
-                        key={skill}
-                        className="px-2 py-1 bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 text-xs rounded"
-                      >
-                        {skill}
-                      </span>
-                    ))}
-                    {match.user.skills.length > 3 && (
-                      <span className="px-2 py-1 bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 text-xs rounded">
-                        +{match.user.skills.length - 3} more
-                      </span>
+                    ) : (
+                      <div className="w-24 h-24 bg-indigo-500 rounded-full flex items-center justify-center">
+                        <User className="w-12 h-12 text-white" />
+                      </div>
                     )}
                   </div>
                 </div>
-              )}
 
-              {match.user.availability && match.user.availability.length > 0 && (
-                <div className="mb-4">
-                  <div className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                    Available
+                {/* Profile Info */}
+                <div className="p-6">
+                  <div className="mb-4">
+                    <h3 className="text-xl font-bold text-gray-900 mb-1">{match.user.name}</h3>
+                    <div className="flex items-center gap-2 text-gray-600">
+                      <MapPin className="w-4 h-4" />
+                      <span className="text-sm">{match.user.location || 'Location not specified'}</span>
+                    </div>
                   </div>
-                  <div className="flex flex-wrap gap-1">
-                    {match.user.availability.slice(0, 2).map((time: string) => (
-                      <span
-                        key={time}
-                        className="px-2 py-1 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 text-xs rounded"
-                      >
-                        {time}
-                      </span>
-                    ))}
-                    {match.user.availability.length > 2 && (
-                      <span className="px-2 py-1 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 text-xs rounded">
-                        +{match.user.availability.length - 2} more
-                      </span>
-                    )}
+
+                  {/* Compatibility Breakdown */}
+                  <div className="mb-4">
+                    <div className="grid grid-cols-2 gap-2 text-xs">
+                      <div className="flex justify-between">
+                        <span>Skills:</span>
+                        <span className="font-medium">{Math.round(match.compatibility.skills)}%</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>Interests:</span>
+                        <span className="font-medium">{Math.round(match.compatibility.interests)}%</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>Goals:</span>
+                        <span className="font-medium">{Math.round(match.compatibility.goals)}%</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>Schedule:</span>
+                        <span className="font-medium">{Math.round(match.compatibility.availability)}%</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Match Reasons */}
+                  <div className="mb-4">
+                    <h4 className="text-sm font-medium text-gray-700 mb-2">Why you match:</h4>
+                    <div className="space-y-1">
+                      {match.reasons.slice(0, 2).map((reason, idx) => (
+                        <div key={idx} className="text-xs text-gray-600 bg-gray-50 px-2 py-1 rounded">
+                          {reason}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Skills */}
+                  <div className="mb-4">
+                    <div className="flex flex-wrap gap-1">
+                      {match.user.skills?.slice(0, 4).map((skill: string, idx: number) => (
+                        <span
+                          key={idx}
+                          className="px-2 py-1 bg-indigo-100 text-indigo-700 text-xs rounded-full"
+                        >
+                          {skill}
+                        </span>
+                      ))}
+                      {match.user.skills?.length > 4 && (
+                        <span className="px-2 py-1 bg-gray-100 text-gray-600 text-xs rounded-full">
+                          +{match.user.skills.length - 4} more
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Action: Send/Requested/Respond only on Find page */}
+                  <div className="flex gap-3">
+                    {(() => {
+                      const isPendingToUser = outgoing.some(r => r.status === 'pending' && r.receiverId === match.user.uid)
+                      const isIncomingFromUser = incoming.some(r => r.status === 'pending' && r.requesterId === match.user.uid)
+                      if (isPendingToUser) {
+                        return (
+                          <button disabled className="px-4 py-2 bg-gray-200 text-gray-600 rounded-xl cursor-not-allowed flex items-center gap-2">
+                            <Send className="w-4 h-4" /> Requested
+                          </button>
+                        )
+                      }
+                      if (isIncomingFromUser) {
+                        return (
+                          <button onClick={() => router.push('/dashboard/match/requests')} className="px-4 py-2 bg-yellow-500 hover:bg-yellow-600 text-white rounded-xl flex items-center gap-2">
+                            <Inbox className="w-4 h-4" /> Respond
+                          </button>
+                        )
+                      }
+                      return (
+                        <button
+                          onClick={async () => {
+                            if (!user) return;
+                            try {
+                              await sendMatchRequest(match.user.uid)
+                              alert('Request sent!')
+                            } catch (e) {
+                              console.error(e)
+                              alert('Failed to send request')
+                            }
+                          }}
+                          className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl transition-colors flex items-center gap-2"
+                          title="Send match request"
+                        >
+                          <Send className="w-4 h-4" />
+                        </button>
+                      )
+                    })()}
                   </div>
                 </div>
-              )}
-
-              <div className="flex gap-2">
-                <button className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-[#85BCB1] text-white rounded-lg hover:bg-[#645990] transition">
-                  <MessageCircle className="w-4 h-4" />
-                  Message
-                </button>
-                <button className="flex-1 flex items-center justify-center gap-2 px-4 py-2 border border-[#85BCB1] text-[#85BCB1] rounded-lg hover:bg-[#85BCB1] hover:text-white transition">
-                  <Calendar className="w-4 h-4" />
-                  Schedule
-                </button>
               </div>
-            </div>
-          ))}
-        </div>
-      )}
+            ))}
+          </div>
+        )}
+
+        {/* No Matches */}
+        {!loading && !error && filteredMatches.length === 0 && (
+          <div className="text-center py-12">
+            <Users className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+            <h3 className="text-xl font-medium text-gray-900 mb-2">No matches found</h3>
+            <p className="text-gray-600 mb-6">
+              Try adjusting your filters or check back later for new users.
+            </p>
+            <button
+              onClick={() => {
+                setSearchTerm("");
+                setSelectedSkills([]);
+                setSelectedInterests([]);
+              }}
+              className="bg-indigo-500 hover:bg-indigo-600 text-white px-6 py-3 rounded-xl font-medium transition-colors"
+            >
+              Clear Filters
+            </button>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

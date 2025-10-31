@@ -1,9 +1,19 @@
 "use client";
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { 
+  onAuthStateChanged, 
+  signInWithEmailAndPassword, 
+  createUserWithEmailAndPassword,
+  signOut as firebaseSignOut,
+  User as FirebaseUser
+} from 'firebase/auth';
+import { doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
+import { auth, db } from './firebase';
 
 interface User {
   uid: string;
   email: string;
+  password?: string; // Add password field
   name: string;
   role: 'mentor' | 'buddy' | 'mentee';
   age?: string;
@@ -25,8 +35,8 @@ interface AuthContextType {
   loading: boolean;
   signIn: (email: string, password: string) => Promise<void>;
   signUp: (userData: Omit<User, 'uid' | 'createdAt' | 'status'>) => Promise<void>;
-  signOut: () => void;
-  updateProfile: (updates: Partial<User>) => void;
+  signOut: () => Promise<void>;
+  updateProfile: (updates: Partial<User>) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -36,73 +46,100 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Check for stored user data on app load
-    const storedUser = localStorage.getItem('peerup_user');
-    if (storedUser) {
-      try {
-        setUser(JSON.parse(storedUser));
-      } catch (error) {
-        console.error('Error parsing stored user:', error);
-        localStorage.removeItem('peerup_user');
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser: FirebaseUser | null) => {
+      if (firebaseUser) {
+        try {
+          // Get user data from Firestore
+          const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
+          if (userDoc.exists()) {
+            const userData = userDoc.data() as User;
+            setUser(userData);
+          } else {
+            // User doesn't exist in Firestore, create basic profile
+            const basicUser: User = {
+              uid: firebaseUser.uid,
+              email: firebaseUser.email || '',
+              name: firebaseUser.displayName || firebaseUser.email?.split('@')[0] || 'User',
+              role: 'buddy',
+              profilePicUrl: firebaseUser.photoURL || '',
+              status: 'active',
+              createdAt: new Date().toISOString(),
+            };
+            await setDoc(doc(db, 'users', firebaseUser.uid), basicUser);
+            setUser(basicUser);
+          }
+        } catch (error) {
+          console.error('Error fetching user data:', error);
+          console.error('Error details:', JSON.stringify(error, null, 2));
+          // Still set a basic user to prevent blocking authentication
+          const basicUser: User = {
+            uid: firebaseUser.uid,
+            email: firebaseUser.email || '',
+            name: firebaseUser.displayName || firebaseUser.email?.split('@')[0] || 'User',
+            role: 'buddy',
+            profilePicUrl: firebaseUser.photoURL || '',
+            status: 'active',
+            createdAt: new Date().toISOString(),
+          };
+          setUser(basicUser);
+        }
+      } else {
+        setUser(null);
       }
-    }
-    setLoading(false);
+      setLoading(false);
+    });
+
+    return () => unsubscribe();
   }, []);
 
   const signIn = async (email: string, password: string) => {
-    // Simulate authentication delay
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    
-    // For demo purposes, accept any email/password combination
-    // In a real app, you'd validate against a backend
-    const fakeUser: User = {
-      uid: `user_${Date.now()}`,
-      email,
-      name: email.split('@')[0], // Use email prefix as name
-      role: 'buddy',
-      age: '25',
-      location: 'New York, NY',
-      linkedin: 'linkedin.com/in/user',
-      skills: ['javascript', 'react', 'python'],
-      interests: ['web development', 'AI', 'startups'],
-      goals: 'Build a successful tech career and help others grow',
-      availability: ['monday', 'wednesday', 'friday'],
-      interaction: 'video',
-      profilePicUrl: '',
-      resumeUrl: '',
-      status: 'active',
-      createdAt: new Date().toISOString(),
-    };
-
-    setUser(fakeUser);
-    localStorage.setItem('peerup_user', JSON.stringify(fakeUser));
+    try {
+      await signInWithEmailAndPassword(auth, email, password);
+      // User state will be updated by onAuthStateChanged
+    } catch (error: any) {
+      throw new Error(error.message || 'Failed to sign in');
+    }
   };
 
   const signUp = async (userData: Omit<User, 'uid' | 'createdAt' | 'status'>) => {
-    // Simulate registration delay
-    await new Promise(resolve => setTimeout(resolve, 1500));
-    
-    const newUser: User = {
-      ...userData,
-      uid: `user_${Date.now()}`,
-      status: userData.role === 'mentor' ? 'pending_review' : 'active',
-      createdAt: new Date().toISOString(),
-    };
+    try {
+      // Create Firebase auth user with the actual password
+      const password = userData.password || userData.email; // Use provided password or fallback to email
+      const userCredential = await createUserWithEmailAndPassword(auth, userData.email, password);
+      
+      // Create user document in Firestore (without password)
+      const { password: _, ...userDataWithoutPassword } = userData;
+      const newUser: User = {
+        ...userDataWithoutPassword,
+        uid: userCredential.user.uid,
+        status: userData.role === 'mentor' ? 'pending_review' : 'active',
+        createdAt: new Date().toISOString(),
+      };
 
-    setUser(newUser);
-    localStorage.setItem('peerup_user', JSON.stringify(newUser));
+      await setDoc(doc(db, 'users', userCredential.user.uid), newUser);
+      // User state will be updated by onAuthStateChanged
+    } catch (error: any) {
+      throw new Error(error.message || 'Failed to create account');
+    }
   };
 
-  const signOut = () => {
-    setUser(null);
-    localStorage.removeItem('peerup_user');
+  const signOut = async () => {
+    try {
+      await firebaseSignOut(auth);
+      // User state will be updated by onAuthStateChanged
+    } catch (error: any) {
+      throw new Error(error.message || 'Failed to sign out');
+    }
   };
 
-  const updateProfile = (updates: Partial<User>) => {
+  const updateProfile = async (updates: Partial<User>) => {
     if (user) {
-      const updatedUser = { ...user, ...updates };
-      setUser(updatedUser);
-      localStorage.setItem('peerup_user', JSON.stringify(updatedUser));
+      try {
+        await updateDoc(doc(db, 'users', user.uid), updates);
+        setUser({ ...user, ...updates });
+      } catch (error: any) {
+        throw new Error(error.message || 'Failed to update profile');
+      }
     }
   };
 

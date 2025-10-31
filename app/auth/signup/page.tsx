@@ -176,6 +176,7 @@ function SignupForm() {
       // Create user data
       const userData = {
         email,
+        password,
         name,
         role: role as 'mentor' | 'buddy' | 'mentee',
         age: age || "",

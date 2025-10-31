@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import './globals.css'
 import { ThemeProvider } from '@/components/theme-provider'
 import { AuthProvider } from '@/lib/auth-context'
+import FeedbackButtonClient from '@/components/FeedbackButtonClient'
 
 export const metadata: Metadata = {
   title: 'PeerUp - Learn. Match. Repeat.',
@@ -41,6 +42,7 @@ export default function RootLayout({
             disableTransitionOnChange
           >
             {children}
+            <FeedbackButtonClient />
           </ThemeProvider>
         </AuthProvider>
       </body>

@@ -1,0 +1,16 @@
+// firebase.config.js.example
+// Copy this file to firebase.config.js and add your own keys
+
+const firebaseConfig = {
+  apiKey: "YOUR_API_KEY_GOES_HERE",
+  authDomain: "YOUR_AUTH_DOMAIN_GOES_HERE",
+  projectId: "YOUR_PROJECT_ID_GOES_HERE",
+  storageBucket: "YOUR_STORAGE_BUCKET_GOES_HERE",
+  messagingSenderId: "YOUR_MESSAGING_SENDER_ID_GOES_HERE",
+  appId: "YOUR_APP_ID_GOES_HERE",
+  measurementId: "YOUR_MEASUREMENT_ID_GOES_HERE"
+};
+
+module.exports = { firebaseConfig };
+
+

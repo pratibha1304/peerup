@@ -16,6 +16,7 @@ import {
   Filter,
   RefreshCw,
   Heart,
+  UserCheck,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { auth, db } from "@/lib/firebase";
@@ -92,6 +93,13 @@ export function Sidebar() {
       },
     ];
 
+    const mutualMatchesLink = {
+      href: "/dashboard/match/mutual",
+      label: "Mutual Matches",
+      icon: UserCheck,
+      tooltip: "🤝 View your confirmed matches and partners.",
+    };
+
     if (user?.role === "buddy") {
       return [
         ...baseLinks.slice(0, 2), // Dashboard, Goals
@@ -101,6 +109,7 @@ export function Sidebar() {
           icon: Users,
           tooltip: "🔍 Find your accountability partner (or partner in crime).",
         },
+        mutualMatchesLink,
         ...baseLinks.slice(2), // Sessions, Messages, Profile, Settings
       ];
     } else if (user?.role === "mentor") {
@@ -112,6 +121,7 @@ export function Sidebar() {
           icon: GraduationCap,
           tooltip: "🎓 Find mentees who need your guidance.",
         },
+        mutualMatchesLink,
         ...baseLinks.slice(2), // Sessions, Messages, Profile, Settings
       ];
     } else {
@@ -130,6 +140,7 @@ export function Sidebar() {
           icon: GraduationCap,
           tooltip: "🎓 Get mentored by someone who actually gets it.",
         },
+        mutualMatchesLink,
         ...baseLinks.slice(2), // Sessions, Messages, Profile, Settings
       ];
     }
