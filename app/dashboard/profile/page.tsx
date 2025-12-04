@@ -3,6 +3,9 @@ import { useEffect, useState, useRef } from "react";
 import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { User, Camera, Save, RefreshCw, AlertCircle, CheckCircle } from "lucide-react";
 import { initializeApp, getApps } from "firebase/app";
+import { MultiCombobox } from "@/components/ui/multi-combobox";
+import { PROFILE_TAGS } from "@/lib/profile-options";
+import { useAuth } from "@/lib/auth-context";
 
 // Add your Firebase config here or use environment variables
 const firebaseConfig = {
@@ -22,10 +25,6 @@ const ROLES = [
   { value: "mentor", label: "Mentor", desc: "Guide others, share your expertise" },
   { value: "buddy", label: "Buddy", desc: "Find study partners, collaborate together" },
   { value: "mentee", label: "Mentee", desc: "Learn from mentors, track progress" },
-];
-
-const SKILLS_LIST = [
-  "javascript", "python", "java", "c++", "react", "node.js", "express", "mongodb", "sql", "typescript", "html", "css", "ui/ux", "design", "marketing", "business", "data science", "machine learning", "ai", "cloud", "aws", "azure", "gcp", "devops", "docker", "kubernetes", "git", "figma", "photoshop", "illustrator", "writing", "public speaking", "photography", "music", "finance", "accounting", "product management", "project management", "leadership", "teamwork", "problem solving", "critical thinking", "communication", "sales", "content creation", "seo", "social media", "video editing", "animation", "cybersecurity", "blockchain", "solidity", "flutter", "android", "ios", "swift", "kotlin", "go", "ruby", "php", "laravel", "django", "flask", "r", "matlab", "statistics", "research", "biology", "chemistry", "physics", "mathematics", "economics", "psychology", "education", "teaching", "coaching", "mentoring", "sports", "fitness", "yoga", "meditation", "health", "nutrition", "cooking", "baking", "languages", "french", "spanish", "german", "hindi", "chinese", "japanese", "korean", "arabic", "travel", "gaming", "esports", "volunteering", "sustainability", "environment", "robotics", "electronics", "hardware", "networking", "testing", "qa", "customer support", "hr", "recruitment", "legal", "law", "medicine", "nursing", "veterinary", "architecture", "interior design", "fashion", "event planning", "journalism", "blogging", "podcasting", "comedy", "acting", "film", "theatre", "dance", "painting", "sculpture", "calligraphy", "crafts", "diy", "gardening", "parenting", "pets", "astrology", "spirituality", "philosophy", "history", "politics", "international relations"
 ];
 
 const AVAILABILITY_OPTIONS = [
@@ -54,35 +53,95 @@ export default function ProfilePage() {
   const [interaction, setInteraction] = useState("");
   const [profilePic, setProfilePic] = useState<File | null>(null);
   const [profilePicUrl, setProfilePicUrl] = useState("");
+  const [resumeUrl, setResumeUrl] = useState("");
+  const { user, loading: authLoading, updateProfile: updateUserProfile } = useAuth();
 
   useEffect(() => {
-    const fetchProfile = async () => {
-      try {
-        
-      } catch (e) {
-        setError("Failed to fetch profile.");
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchProfile();
-  }, []);
+    if (authLoading) return;
+    if (!user) {
+      setLoading(false);
+      return;
+    }
+    setProfile(user);
+    setName(user.name || "");
+    setRole(user.role || "");
+    setAge(user.age || "");
+    setLocation(user.location || "");
+    setLinkedin(user.linkedin || "");
+    setSkills(user.skills || []);
+    setInterests(user.interests || []);
+    setGoals(user.goals || "");
+    setAvailability(user.availability || []);
+    setInteraction(user.interaction || "");
+    setProfilePicUrl(user.profilePicUrl || "");
+    setResumeUrl(user.resumeUrl || "");
+    setLoading(false);
+  }, [authLoading, user]);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
       setProfilePic(file);
+      const previewUrl = URL.createObjectURL(file);
+      setProfilePicUrl(previewUrl);
     }
   };
 
+  useEffect(() => {
+    if (!profilePicUrl || !profilePicUrl.startsWith("blob:")) return;
+    return () => {
+      URL.revokeObjectURL(profilePicUrl);
+    };
+  }, [profilePicUrl]);
+
   const handleSave = async () => {
+    if (!user) {
+      setError("You must be signed in to update your profile.");
+      return;
+    }
+    if (!name.trim()) {
+      setError("Name is required.");
+      return;
+    }
+    if (!role) {
+      setError("Please select a role.");
+      return;
+    }
+    if (role === "mentor" && !resumeUrl.trim()) {
+      setError("Mentors must include a portfolio or resume link.");
+      return;
+    }
     setSaving(true);
     setError("");
     setSuccess(false);
     try {
-    
+      let uploadedUrl = profilePicUrl;
+      if (profilePic) {
+        const fileRef = ref(storage, `profile-pictures/${user.uid}/${Date.now()}-${profilePic.name}`);
+        await uploadBytes(fileRef, profilePic);
+        uploadedUrl = await getDownloadURL(fileRef);
+        setProfilePic(null);
+      }
+
+      const updates = {
+        name: name.trim(),
+        role,
+        age: age.trim(),
+        location: location.trim(),
+        linkedin: linkedin.trim(),
+        skills,
+        interests,
+        goals: goals.trim(),
+        availability,
+        interaction,
+        profilePicUrl: uploadedUrl,
+        resumeUrl: resumeUrl.trim(),
+      };
+
+      await updateUserProfile(updates);
+      setProfile((prev: any) => ({ ...(prev || {}), ...updates }));
+      setProfilePicUrl(uploadedUrl);
       setSuccess(true);
-     
       setTimeout(() => setSuccess(false), 3000);
     } catch (err: any) {
       setError(err.message || "Failed to save profile");
@@ -99,10 +158,21 @@ export default function ProfilePage() {
     }
   };
 
-  if (loading) {
+  if (loading || authLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-lg">Loading your profile...</div>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center space-y-4">
+          <h2 className="text-2xl font-semibold">You need to be signed in</h2>
+          <p className="text-gray-500">Log in again to edit your profile.</p>
+        </div>
       </div>
     );
   }
@@ -112,6 +182,9 @@ export default function ProfilePage() {
       <div className="mb-8">
         <h1 className="text-3xl font-bold text-[#645990] dark:text-[#85BCB1] mb-2">Edit Your Profile</h1>
         <p className="text-gray-600 dark:text-gray-300">Update your info, switch roles, and show off your skills.</p>
+          <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+            Changes are shared with your matches instantly. Mentors must keep an up-to-date portfolio or resume link on file.
+          </p>
       </div>
 
       {error && (
@@ -157,6 +230,27 @@ export default function ProfilePage() {
               <p className="text-sm text-gray-500 text-center">
                 Click the camera icon to upload a new picture
               </p>
+              <div className="w-full mt-6">
+                <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Snapshot</h3>
+                <div className="text-sm text-gray-600 dark:text-gray-400 space-y-2">
+                  <p><span className="font-medium text-gray-800 dark:text-gray-100">Email:</span> {profile?.email}</p>
+                  <p><span className="font-medium text-gray-800 dark:text-gray-100">Role:</span> {profile?.role}</p>
+                  {profile?.resumeUrl && (
+                    <p>
+                      <span className="font-medium text-gray-800 dark:text-gray-100">Portfolio:</span>{" "}
+                      <a href={profile.resumeUrl} target="_blank" rel="noreferrer" className="text-[#2C6485] hover:underline">
+                        View link
+                      </a>
+                    </p>
+                  )}
+                  {profile?.availability?.length ? (
+                    <p>
+                      <span className="font-medium text-gray-800 dark:text-gray-100">Availability:</span>{" "}
+                      {profile.availability.join(", ")}
+                    </p>
+                  ) : null}
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -226,6 +320,23 @@ export default function ProfilePage() {
             </div>
 
             <div className="mb-6">
+              <label className="block mb-2 font-medium">
+                Portfolio / Resume {role === "mentor" && <span className="text-red-500">*</span>}
+              </label>
+              <input
+                type="url"
+                value={resumeUrl}
+                onChange={(e) => setResumeUrl(e.target.value)}
+                className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-[#85BCB1] focus:border-transparent"
+                placeholder="https://your-site.com/resume.pdf"
+                required={role === "mentor"}
+              />
+              <p className="text-xs text-gray-500 mt-2">
+                Share a portfolio, resume, or calendar link so mentees can verify your experience.
+              </p>
+            </div>
+
+            <div className="mb-6">
               <label className="block mb-2 font-medium">Goals</label>
               <textarea
                 value={goals}
@@ -237,45 +348,27 @@ export default function ProfilePage() {
             </div>
 
             <div className="mb-6">
-              <label className="block mb-2 font-medium">Skills (max 5)</label>
-              <div className="flex flex-wrap gap-2">
-                {SKILLS_LIST.slice(0, 20).map((skill) => (
-                  <button
-                    key={skill}
-                    type="button"
-                    onClick={() => toggleMultiSelect(skill, skills, setSkills, 5)}
-                    className={`px-3 py-1 rounded-full text-sm border ${
-                      skills.includes(skill)
-                        ? "bg-[#85BCB1] text-white border-[#85BCB1]"
-                        : "bg-gray-100 text-gray-700 border-gray-300 hover:bg-gray-200"
-                    }`}
-                  >
-                    {skill}
-                  </button>
-                ))}
-              </div>
-              <p className="text-xs text-gray-500 mt-2">Selected: {skills.join(", ")}</p>
+              <MultiCombobox
+                label="Skills (max 5)"
+                options={PROFILE_TAGS}
+                value={skills}
+                onChange={setSkills}
+                maxSelected={5}
+                placeholder="Type to search skills, tools, or domains"
+                helperText={`Selected ${skills.length}/5 skills. The same options are used across roles for accurate matching.`}
+              />
             </div>
 
             <div className="mb-6">
-              <label className="block mb-2 font-medium">Interests (max 5)</label>
-              <div className="flex flex-wrap gap-2">
-                {SKILLS_LIST.slice(20, 40).map((interest) => (
-                  <button
-                    key={interest}
-                    type="button"
-                    onClick={() => toggleMultiSelect(interest, interests, setInterests, 5)}
-                    className={`px-3 py-1 rounded-full text-sm border ${
-                      interests.includes(interest)
-                        ? "bg-[#645990] text-white border-[#645990]"
-                        : "bg-gray-100 text-gray-700 border-gray-300 hover:bg-gray-200"
-                    }`}
-                  >
-                    {interest}
-                  </button>
-                ))}
-              </div>
-              <p className="text-xs text-gray-500 mt-2">Selected: {interests.join(", ")}</p>
+              <MultiCombobox
+                label="Interests (max 5)"
+                options={PROFILE_TAGS}
+                value={interests}
+                onChange={setInterests}
+                maxSelected={5}
+                placeholder="Type to search interests or activities"
+                helperText={`Selected ${interests.length}/5 interests. Pick what excites you, not just study topics.`}
+              />
             </div>
 
             <div className="mb-6">

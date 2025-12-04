@@ -16,6 +16,7 @@ import {
   Filter,
   RefreshCw,
   Heart,
+  UserCheck,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { auth, db } from "@/lib/firebase";
@@ -92,6 +93,13 @@ export function Sidebar() {
       },
     ];
 
+    const mutualMatchesLink = {
+      href: "/dashboard/match/mutual",
+      label: "Mutual Matches",
+      icon: UserCheck,
+      tooltip: "🤝 View your confirmed matches and partners.",
+    };
+
     if (user?.role === "buddy") {
       return [
         ...baseLinks.slice(0, 2), // Dashboard, Goals
@@ -101,7 +109,20 @@ export function Sidebar() {
           icon: Users,
           tooltip: "🔍 Find your accountability partner (or partner in crime).",
         },
+        mutualMatchesLink,
         ...baseLinks.slice(2), // Sessions, Messages, Profile, Settings
+      ];
+    } else if (user?.role === "mentee") {
+      return [
+        ...baseLinks.slice(0, 2),
+        {
+          href: "/dashboard/mentor",
+          label: "Find Mentor",
+          icon: GraduationCap,
+          tooltip: "🎯 Explore mentors who match your skills and interests.",
+        },
+        mutualMatchesLink,
+        ...baseLinks.slice(2),
       ];
     } else if (user?.role === "mentor") {
       return [
@@ -112,10 +133,11 @@ export function Sidebar() {
           icon: GraduationCap,
           tooltip: "🎓 Find mentees who need your guidance.",
         },
+        mutualMatchesLink,
         ...baseLinks.slice(2), // Sessions, Messages, Profile, Settings
       ];
     } else {
-      // mentee or default
+      // default fallback
       return [
         ...baseLinks.slice(0, 2), // Dashboard, Goals
         {
@@ -130,6 +152,7 @@ export function Sidebar() {
           icon: GraduationCap,
           tooltip: "🎓 Get mentored by someone who actually gets it.",
         },
+        mutualMatchesLink,
         ...baseLinks.slice(2), // Sessions, Messages, Profile, Settings
       ];
     }
@@ -182,15 +205,9 @@ export function Sidebar() {
                     ? "bg-primary/20 text-primary shadow-lg" 
                     : "text-muted-foreground hover:text-foreground"
                 }`}
-                title={link.tooltip}
               >
                 <link.icon className="w-5 h-5" />
                 {!collapsed && <span>{link.label}</span>}
-                {!collapsed && (
-                  <span className="ml-auto opacity-0 group-hover:opacity-100 text-xs text-muted-foreground transition-opacity">
-                    {link.tooltip}
-                  </span>
-                )}
               </a>
             </Link>
           ))}

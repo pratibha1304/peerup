@@ -1,12 +1,32 @@
 "use client";
 import { useEffect } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
-import { Sparkles, TrendingUp, Users, Calendar, Star, Bot, AlertCircle } from "lucide-react";
+import { useDashboardStats } from "@/hooks/use-dashboard-stats";
+import {
+  Activity,
+  AlertCircle,
+  CalendarDays,
+  MessageCircle,
+  PhoneMissed,
+  Target,
+  Users,
+} from "lucide-react";
+
+const iconMap: Record<string, any> = {
+  messages: MessageCircle,
+  missedCalls: PhoneMissed,
+  goals: Target,
+  requests: Users,
+  matches: Activity,
+  sessions: CalendarDays,
+};
 
 export default function DashboardPage() {
   const { user, loading } = useAuth();
   const router = useRouter();
+  const stats = useDashboardStats(user);
 
   useEffect(() => {
     if (!loading && !user) {
@@ -17,101 +37,209 @@ export default function DashboardPage() {
   if (loading || !user) {
     return (
       <div className="flex items-center justify-center min-h-screen">
-        <div className="text-lg">Loading your chaos...</div>
+        <div className="text-lg">Loading your dashboard...</div>
       </div>
     );
   }
 
-  // Profile completeness check
-  const requiredFields = ["name", "role", "goals", "skills", "interests", "availability"];
-  const incompleteFields = requiredFields.filter(
-    (field) => !user?.[field] || (Array.isArray(user[field]) && user[field].length === 0)
-  );
-  const isProfileIncomplete = incompleteFields.length > 0;
-
-  // Fake stats for demo
-  const stats = [
-    { label: "Matches", value: 3, icon: Users },
-    { label: "Goals Tracked", value: 5, icon: TrendingUp },
-    { label: "Sessions", value: 12, icon: Calendar },
-    { label: "Achievements", value: 2, icon: Star },
-    { label: "AI Chats", value: 7, icon: Bot },
-    { label: "Streak", value: "4d", icon: TrendingUp },
-  ];
-
-  // Fake goal progress
-  const goalProgress = 70; // percent
-  const badge = goalProgress >= 80 ? "Crushing it!" : goalProgress >= 50 ? "Keep going!" : "Just getting started";
-
   return (
     <div className="w-full">
-      {/* Profile Incomplete Warning */}
-      {isProfileIncomplete && (
-        <div className="mb-6 p-4 rounded-xl text-sm font-semibold bg-[#85BCB1] text-white">
-          <div className="flex items-center gap-2 mb-2">
-            <AlertCircle className="w-5 h-5" />
-            <span>Your profile is looking a little empty. Maybe fill it out before you start judging others?</span>
-          </div>
-          <div className="text-xs opacity-90">Missing: {incompleteFields.join(", ")}</div>
-        </div>
-      )}
-
-      {/* Mentor Review Notice */}
-      {user.role === "mentor" && user.status === "pending_review" && (
-        <div className="mb-6 p-4 rounded-xl text-sm font-semibold bg-[#645990] text-white">
-          Mentor application under review. Sit tight, we're deciding if you're cool enough.
-        </div>
-      )}
-
-      {/* Greeting */}
       <div className="mb-8">
-        <h1 className="text-4xl font-extrabold mb-2 text-[#645990] dark:text-[#85BCB1]">
-          Hey {user?.name || "there"}, welcome to the chaos.
+        <p className="text-sm uppercase tracking-wide text-muted-foreground">Welcome back</p>
+        <h1 className="text-4xl font-extrabold mb-1 text-[#645990] dark:text-[#85BCB1]">
+          Hey {user.name || "there"}
         </h1>
-        <p className="text-lg text-gray-700 dark:text-gray-200">
-          Here's your dashboard. Try not to break anything.
+        <p className="text-lg text-muted-foreground">
+          Here’s what needs your attention right now.
         </p>
       </div>
 
-      {/* Quick Stats */}
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-8">
-        {stats.map((stat) => (
-          <div key={stat.label} className="flex flex-col items-center bg-white dark:bg-[#23272f] rounded-xl p-4 shadow">
-            <stat.icon className="w-6 h-6 mb-1 text-[#85BCB1] dark:text-[#645990]" />
-            <div className="text-xl font-bold text-[#2C6485] dark:text-white">{stat.value}</div>
-            <div className="text-xs text-gray-500 dark:text-gray-300">{stat.label}</div>
-          </div>
-        ))}
+      {stats.alerts.length > 0 && (
+        <div className="mb-6 space-y-3">
+          {stats.alerts.map((alert) => (
+            <div
+              key={alert.id}
+              className={`flex flex-col gap-2 rounded-xl border p-4 text-sm ${
+                alert.severity === "warn"
+                  ? "border-amber-400 bg-amber-50 dark:bg-amber-500/10"
+                  : "border-primary/40 bg-primary/5"
+              }`}
+            >
+              <div className="flex items-center gap-2 font-medium">
+                <AlertCircle className="h-4 w-4" />
+                <span>{alert.message}</span>
+              </div>
+              {alert.actionHref && alert.actionLabel && (
+                <Link
+                  href={alert.actionHref}
+                  className="text-xs font-semibold text-primary hover:underline w-fit"
+                >
+                  {alert.actionLabel}
+                </Link>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+
+      <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-4 mb-8">
+        {stats.cards.map((card) => {
+          const Icon = iconMap[card.id] || Activity;
+          return (
+            <div
+              key={card.id}
+              className="rounded-2xl border bg-white/70 dark:bg-[#23272f] p-4 shadow-sm"
+            >
+              <div className="flex items-start justify-between mb-6">
+                <div>
+                  <p className="text-xs uppercase tracking-wide text-muted-foreground">
+                    {card.label}
+                  </p>
+                  <div className="text-3xl font-bold mt-2">{card.value}</div>
+                </div>
+                <div className="rounded-full bg-primary/10 p-2 text-primary">
+                  <Icon className="h-5 w-5" />
+                </div>
+              </div>
+              {card.helper && (
+                <p className="text-xs text-muted-foreground">{card.helper}</p>
+              )}
+            </div>
+          );
+        })}
       </div>
 
-      {/* Goal Tracker */}
-      <div className="mb-8 bg-white dark:bg-[#23272f] rounded-xl p-6 shadow">
-        <div className="flex flex-col md:flex-row items-center gap-6">
-          <div className="flex-1">
-            <div className="text-lg font-semibold mb-2">Goal Progress</div>
-            <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-4 mb-2">
+      <div className="grid lg:grid-cols-3 gap-6 mb-8">
+        <div className="lg:col-span-2 space-y-6">
+          <div className="rounded-2xl border bg-white dark:bg-[#23272f] p-6 shadow-sm">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <p className="text-sm uppercase tracking-wide text-muted-foreground">
+                  Goal coverage
+                </p>
+                <h2 className="text-2xl font-semibold">{stats.goalSummary.goalPercent}%</h2>
+              </div>
+              <span className="text-sm text-muted-foreground">
+                {stats.goalSummary.openTasks} open tasks
+              </span>
+            </div>
+            <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-3 mb-3">
               <div
-                className="bg-gradient-to-r from-[#85BCB1] to-[#645990] h-4 rounded-full transition-all duration-500"
-                style={{ width: `${goalProgress}%` }}
+                className="bg-gradient-to-r from-[#85BCB1] to-[#645990] h-3 rounded-full transition-all duration-500"
+                style={{ width: `${stats.goalSummary.goalPercent}%` }}
               />
             </div>
-            <div className="text-sm text-gray-600 dark:text-gray-300">{goalProgress}% complete - {badge}</div>
+            <p className="text-xs text-muted-foreground">
+              Tracking {stats.goalSummary.totalGoals} goal
+              {stats.goalSummary.totalGoals === 1 ? "" : "s"} across partnerships.
+            </p>
+          </div>
+
+          <div className="rounded-2xl border bg-white dark:bg-[#23272f] p-6 shadow-sm">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold">Focus goals</h3>
+              <Link
+                href="/dashboard/match"
+                className="text-sm font-medium text-primary hover:underline"
+              >
+                Manage matches
+              </Link>
+            </div>
+            {stats.focusGoals.length === 0 ? (
+              <p className="text-sm text-muted-foreground">All active goals are on track.</p>
+            ) : (
+              <div className="space-y-3">
+                {stats.focusGoals.map((goal) => (
+                  <div
+                    key={goal.id}
+                    className="rounded-xl border p-4 flex items-center justify-between gap-4"
+                  >
+                    <div>
+                      <p className="font-medium">{goal.title}</p>
+                      <p className="text-xs text-muted-foreground">{goal.taskSummary}</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-lg font-semibold">{goal.percent}%</p>
+                      <Link
+                        href={`/dashboard/match/${goal.matchId}/goals`}
+                        className="text-xs text-primary hover:underline"
+                      >
+                        View tasks
+                      </Link>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div className="space-y-6">
+          <div className="rounded-2xl border bg-white dark:bg-[#23272f] p-6 shadow-sm">
+            <h3 className="text-lg font-semibold mb-4">Upcoming sessions</h3>
+            {stats.upcomingSessions.length === 0 ? (
+              <p className="text-sm text-muted-foreground">No confirmed sessions yet.</p>
+            ) : (
+              <div className="space-y-3">
+                {stats.upcomingSessions.map((session) => (
+                  <div key={session.id} className="rounded-xl border p-4 text-sm">
+                    <p className="font-medium">
+                      {new Date(session.confirmedTime?.toMillis() || 0).toLocaleString()}
+                    </p>
+                    <p className="text-muted-foreground">
+                      {session.requesterName} ↔ {session.receiverName}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <div className="rounded-2xl border bg-white dark:bg-[#23272f] p-6 shadow-sm">
+            <h3 className="text-lg font-semibold mb-2">Match requests</h3>
+            <p className="text-sm text-muted-foreground mb-4">
+              {stats.requests.incoming} incoming • {stats.requests.outgoing} outgoing
+            </p>
+            <Link
+              href="/dashboard/match/requests"
+              className="text-sm font-semibold text-primary hover:underline"
+            >
+              Review requests
+            </Link>
           </div>
         </div>
       </div>
 
-      {/* Profile Details */}
-      <div className="bg-white dark:bg-[#23272f] rounded-xl p-6 shadow">
+      <div className="rounded-2xl border bg-white dark:bg-[#23272f] p-6 shadow-sm">
         <div className="text-lg font-semibold mb-4">Your Profile</div>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div><span className="font-medium">Name:</span> {user.name}</div>
-          <div><span className="font-medium">Email:</span> {user.email}</div>
-          <div><span className="font-medium">Role:</span> {user.role}</div>
-          <div><span className="font-medium">Location:</span> {user.location || "-"}</div>
-          <div><span className="font-medium">Skills:</span> {user.skills?.join(", ") || "-"}</div>
-          <div><span className="font-medium">Interests:</span> {user.interests?.join(", ") || "-"}</div>
-          <div><span className="font-medium">Goals:</span> {user.goals || "-"}</div>
-          <div><span className="font-medium">Availability:</span> {user.availability?.join(", ") || "-"}</div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+          <div>
+            <span className="font-medium">Name:</span> {user.name}
+          </div>
+          <div>
+            <span className="font-medium">Email:</span> {user.email}
+          </div>
+          <div>
+            <span className="font-medium">Role:</span> {user.role}
+          </div>
+          <div>
+            <span className="font-medium">Location:</span> {user.location || "-"}
+          </div>
+          <div>
+            <span className="font-medium">Skills:</span>{" "}
+            {user.skills?.length ? user.skills.join(", ") : "-"}
+          </div>
+          <div>
+            <span className="font-medium">Interests:</span>{" "}
+            {user.interests?.length ? user.interests.join(", ") : "-"}
+          </div>
+          <div>
+            <span className="font-medium">Goals:</span> {user.goals || "-"}
+          </div>
+          <div>
+            <span className="font-medium">Availability:</span>{" "}
+            {user.availability?.length ? user.availability.join(", ") : "-"}
+          </div>
         </div>
       </div>
     </div>

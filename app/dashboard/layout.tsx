@@ -1,5 +1,6 @@
 import { Sidebar } from "@/components/ui/sidebar";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
+import { IncomingCallModal } from "@/components/IncomingCallModal";
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -11,6 +12,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         </div>
         {children}
       </main>
+      <IncomingCallModal />
     </div>
   );
 }

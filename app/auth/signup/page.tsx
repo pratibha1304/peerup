@@ -1,42 +1,21 @@
 "use client";
-import React, { useState, useRef, useEffect, Suspense } from "react";
+import React, { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
-import { ChevronDown, ArrowLeft, Sparkles, User, Target, FileText, CheckCircle } from "lucide-react";
+import { ArrowLeft, Sparkles, User, Target, FileText, CheckCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
-import { Badge } from "@/components/ui/badge";
 import Link from "next/link";
+import { MultiCombobox } from "@/components/ui/multi-combobox";
+import { PROFILE_TAGS } from "@/lib/profile-options";
 
 const ROLES = [
   { value: "mentor", label: "Mentor", desc: "Guide others, share your expertise, and help mentees achieve their goals." },
   { value: "buddy", label: "Buddy", desc: "Find study partners, collaborate, and stay motivated together." },
   { value: "mentee", label: "Mentee", desc: "Learn from mentors, set goals, and track your progress." },
-];
-
-const SKILLS_LIST = [
-  "javascript", "python", "java", "c++", "react", "node.js", "angular", "vue.js",
-  "typescript", "php", "ruby", "go", "rust", "swift", "kotlin", "dart",
-  "html", "css", "sass", "less", "bootstrap", "tailwind", "material-ui",
-  "mongodb", "postgresql", "mysql", "redis", "elasticsearch", "firebase",
-  "aws", "azure", "gcp", "docker", "kubernetes", "jenkins", "git",
-  "machine learning", "data science", "ai", "blockchain", "cybersecurity",
-  "mobile development", "web development", "game development", "devops",
-  "ui/ux design", "graphic design", "digital marketing", "content creation"
-];
-
-const INTERESTS_LIST = [
-  "web development", "mobile development", "data science", "machine learning",
-  "artificial intelligence", "blockchain", "cybersecurity", "cloud computing",
-  "devops", "game development", "ui/ux design", "digital marketing",
-  "content creation", "startups", "entrepreneurship", "product management",
-  "project management", "agile", "scrum", "lean methodology",
-  "open source", "contributing", "mentoring", "teaching",
-  "public speaking", "writing", "blogging", "podcasting",
-  "networking", "community building", "leadership", "team building"
 ];
 
 const AVAILABILITY_OPTIONS = [
@@ -48,80 +27,6 @@ const AVAILABILITY_OPTIONS = [
   { value: "saturday", label: "Saturday" },
   { value: "sunday", label: "Sunday" },
 ];
-
-const INTERACTION_OPTIONS = [
-  { value: "video", label: "Video Call", desc: "Face-to-face interaction" },
-  { value: "voice", label: "Voice Call", desc: "Audio-only communication" },
-  { value: "chat", label: "Chat Only", desc: "Text-based communication" },
-  { value: "mixed", label: "Mixed", desc: "Combination of methods" },
-];
-
-function MultiSelectDropdown({ label, options, selected, setSelected, max }: { label: string, options: string[], selected: string[], setSelected: (a: string[]) => void, max: number }) {
-  const [open, setOpen] = useState(false);
-  const dropdownRef = useRef<HTMLDivElement>(null);
-
-  // Close dropdown on outside click
-  React.useEffect(() => {
-    function handleClick(e: MouseEvent) {
-      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
-        setOpen(false);
-      }
-    }
-    if (open) document.addEventListener("mousedown", handleClick);
-    return () => document.removeEventListener("mousedown", handleClick);
-  }, [open]);
-
-  const handleSelect = (value: string) => {
-    if (selected.includes(value)) return;
-    if (selected.length < max) {
-      setSelected([...selected, value]);
-      setOpen(false);
-    }
-  };
-  const handleRemove = (value: string) => setSelected(selected.filter((v) => v !== value));
-
-  return (
-    <div className="space-y-2">
-      <Label className="text-foreground font-medium">{label}</Label>
-      <div className="relative" ref={dropdownRef}>
-        <div className="flex flex-wrap gap-2 mb-3">
-          {selected.map((item) => (
-            <Badge key={item} variant="secondary" className="bg-primary/20 text-primary border-primary/30">
-              {item}
-              <button type="button" className="ml-2 text-primary hover:text-primary/80" onClick={() => handleRemove(item)}>&times;</button>
-            </Badge>
-          ))}
-        </div>
-        <Button
-          type="button"
-          variant="outline"
-          className="w-full h-12 justify-between border-primary/20 focus:border-primary transition-colors"
-          onClick={() => setOpen((o) => !o)}
-        >
-          <span className="text-muted-foreground">
-            {selected.length > 0 ? `Add more (${max - selected.length} left)` : `Select ${label.toLowerCase()}`}
-          </span>
-          <ChevronDown className="h-4 w-4" />
-        </Button>
-        {open && (
-          <div className="absolute z-10 bg-card border border-primary/20 rounded-xl w-full max-h-48 overflow-y-auto mt-1 shadow-xl">
-            {options.filter((opt) => !selected.includes(opt)).map((option) => (
-              <button
-                type="button"
-                key={option}
-                className="block w-full text-left px-4 py-3 hover:bg-primary/10 transition-colors"
-                onClick={() => handleSelect(option)}
-                disabled={selected.length >= max}
-              >
-                {option}
-              </button>
-            ))}
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
 
 function SignupForm() {
   const router = useRouter();
@@ -141,7 +46,8 @@ function SignupForm() {
   const [role, setRole] = useState(roleParam || "buddy");
   const [age, setAge] = useState("");
   const [location, setLocation] = useState("");
-  const [linkedin, setLinkedin] = useState("");
+const [linkedin, setLinkedin] = useState("");
+const [resumeUrl, setResumeUrl] = useState("");
   const [skills, setSkills] = useState<string[]>([]);
   const [interests, setInterests] = useState<string[]>([]);
   const [goals, setGoals] = useState("");
@@ -172,10 +78,14 @@ function SignupForm() {
       if (!name || !email || !password) {
         throw new Error("Please fill in all required fields");
       }
+      if (role === "mentor" && !resumeUrl.trim()) {
+        throw new Error("Mentors must include a portfolio or resume link");
+      }
       
       // Create user data
       const userData = {
         email,
+        password,
         name,
         role: role as 'mentor' | 'buddy' | 'mentee',
         age: age || "",
@@ -187,7 +97,7 @@ function SignupForm() {
         availability: availability || [],
         interaction: interaction || "",
         profilePicUrl: "",
-        resumeUrl: "",
+        resumeUrl: resumeUrl.trim(),
       };
       
       await signUp(userData);
@@ -333,6 +243,25 @@ function SignupForm() {
                   placeholder="Paste your LinkedIn URL"
                 />
               </div>
+              {role === "mentor" && (
+                <div className="space-y-2">
+                  <Label htmlFor="resume-link" className="text-foreground font-medium">
+                    Portfolio / Resume <span className="text-red-500">*</span>
+                  </Label>
+                  <Input
+                    id="resume-link"
+                    type="url"
+                    value={resumeUrl}
+                    onChange={(e) => setResumeUrl(e.target.value)}
+                    className="h-12 rounded-xl border-primary/20 focus:border-primary transition-colors"
+                    placeholder="https://your-site.com/resume.pdf"
+                    required
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Show mentees what you have worked on—share a portfolio, resume, or case study link.
+                  </p>
+                </div>
+              )}
             </div>
           </div>
         );
@@ -346,8 +275,24 @@ function SignupForm() {
             </div>
             
             <div className="space-y-6">
-              <MultiSelectDropdown label="Skills" options={SKILLS_LIST} selected={skills} setSelected={setSkills} max={5} />
-              <MultiSelectDropdown label="Interests" options={INTERESTS_LIST} selected={interests} setSelected={setInterests} max={3} />
+              <MultiCombobox
+                label="Skills"
+                options={PROFILE_TAGS}
+                value={skills}
+                onChange={setSkills}
+                maxSelected={5}
+                placeholder="Type to search tools, domains, or soft skills"
+                helperText="Select up to 5 skills. These options match exactly with mentor/mentee profiles."
+              />
+              <MultiCombobox
+                label="Interests"
+                options={PROFILE_TAGS}
+                value={interests}
+                onChange={setInterests}
+                maxSelected={5}
+                placeholder="Type to search interests, hobbies, or causes"
+                helperText="Pick up to 5 interests. Same catalogue keeps buddy, mentor, and mentee matching consistent."
+              />
               
               <div className="space-y-2">
                 <Label htmlFor="goals" className="text-foreground font-medium">Goals</Label>

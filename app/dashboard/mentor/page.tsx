@@ -3,11 +3,9 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { auth, db } from "@/lib/firebase";
 import { doc, getDoc, collection, getDocs } from "firebase/firestore";
-import { GraduationCap, Filter, Search, Star, MapPin, Calendar, MessageCircle, RefreshCw, Award, Clock, User } from "lucide-react";
-
-const SKILLS_LIST = [
-  "javascript", "python", "java", "c++", "react", "node.js", "express", "mongodb", "sql", "typescript", "html", "css", "ui/ux", "design", "marketing", "business", "data science", "machine learning", "ai", "cloud", "aws", "azure", "gcp", "devops", "docker", "kubernetes", "git", "figma", "photoshop", "illustrator", "writing", "public speaking", "photography", "music", "finance", "accounting", "product management", "project management", "leadership", "teamwork", "problem solving", "critical thinking", "communication", "sales", "content creation", "seo", "social media", "video editing", "animation", "cybersecurity", "blockchain", "solidity", "flutter", "android", "ios", "swift", "kotlin", "go", "ruby", "php", "laravel", "django", "flask", "r", "matlab", "statistics", "research", "biology", "chemistry", "physics", "mathematics", "economics", "psychology", "education", "teaching", "coaching", "mentoring", "sports", "fitness", "yoga", "meditation", "health", "nutrition", "cooking", "baking", "languages", "french", "spanish", "german", "hindi", "chinese", "japanese", "korean", "arabic", "travel", "gaming", "esports", "volunteering", "sustainability", "environment", "robotics", "electronics", "hardware", "networking", "testing", "qa", "customer support", "hr", "recruitment", "legal", "law", "medicine", "nursing", "veterinary", "architecture", "interior design", "fashion", "event planning", "journalism", "blogging", "podcasting", "comedy", "acting", "film", "theatre", "dance", "painting", "sculpture", "calligraphy", "crafts", "diy", "gardening", "parenting", "pets", "astrology", "spirituality", "philosophy", "history", "politics", "international relations"
-];
+import { GraduationCap, Filter, Search, Star, MapPin, Calendar, MessageCircle, RefreshCw, Award, Clock, User, Send, Inbox } from "lucide-react";
+import { sendMatchRequest, listenIncomingRequests, listenOutgoingRequests, MatchRequest } from '@/lib/matchRequests';
+import { PROFILE_TAGS } from "@/lib/profile-options";
 
 // Simple matching function
 function calculateMatchScore(user: any, candidate: any) {
@@ -50,6 +48,8 @@ export default function MentorPage() {
   const [selectedInterests, setSelectedInterests] = useState<string[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const router = useRouter();
+  const [outgoing, setOutgoing] = useState<MatchRequest[]>([]);
+  const [incoming, setIncoming] = useState<MatchRequest[]>([]);
 
   useEffect(() => {
     const fetchProfileAndMatches = async () => {
@@ -82,31 +82,24 @@ export default function MentorPage() {
         console.log("Total users in database:", allUsers.length);
 
         // Filter available users (exclude current user and pending reviews)
+        if (userProfile.role === 'buddy') {
+          router.push("/dashboard/match");
+          return;
+        }
+
         const availableUsers = allUsers.filter((u: any) => 
           u.uid !== userProfile.uid && 
-          u.status !== 'pending_review' && 
-          u.role && 
-          u.skills && 
-          u.skills.length > 0
+          u.role
         );
         
         console.log("Available users:", availableUsers.length);
 
         // Role-based matching for mentor/mentee
-        let candidates;
+        let candidates: any[] = [];
         if (userProfile.role === 'mentor') {
           candidates = availableUsers.filter((u: any) => u.role === 'mentee');
         } else if (userProfile.role === 'mentee') {
           candidates = availableUsers.filter((u: any) => u.role === 'mentor');
-        } else {
-          // If no role specified, show all available users
-          candidates = availableUsers;
-        }
-
-        // Fallback: if no role-specific matches, show all available users
-        if (candidates.length === 0) {
-          console.log("No role-specific matches, showing all available users");
-          candidates = availableUsers;
         }
 
         console.log("Candidates found:", candidates.length);
@@ -135,6 +128,18 @@ export default function MentorPage() {
     fetchProfileAndMatches();
   }, [router]);
 
+  // Listen to match requests
+  useEffect(() => {
+    const user = auth.currentUser;
+    if (!user) return;
+    const unsubOut = listenOutgoingRequests(user.uid, setOutgoing);
+    const unsubIn = listenIncomingRequests(user.uid, setIncoming);
+    return () => {
+      unsubOut();
+      unsubIn();
+    };
+  }, []);
+
   const toggleMultiSelect = (value: string, arr: string[], setArr: (a: string[]) => void, max: number) => {
     if (arr.includes(value)) {
       setArr(arr.filter((v) => v !== value));
@@ -145,15 +150,16 @@ export default function MentorPage() {
 
   const filteredMatches = matches.filter((match: any) => {
     const user = match.user;
-    const matchesSearch = user.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         user.skills?.some((skill: string) => skill.toLowerCase().includes(searchTerm.toLowerCase())) ||
-                         user.interests?.some((interest: string) => interest.toLowerCase().includes(searchTerm.toLowerCase()));
+    const lowerSearch = searchTerm.toLowerCase();
+    const matchesSearch = user.name?.toLowerCase().includes(lowerSearch) ||
+                         user.skills?.some((skill: string) => skill.toLowerCase().includes(lowerSearch)) ||
+                         user.interests?.some((interest: string) => interest.toLowerCase().includes(lowerSearch));
     
     const matchesSkills = selectedSkills.length === 0 || 
-                         selectedSkills.some(skill => user.skills?.includes(skill));
+                         selectedSkills.some(skill => user.skills?.some((userSkill: string) => userSkill.toLowerCase() === skill));
     
     const matchesInterests = selectedInterests.length === 0 || 
-                            selectedInterests.some(interest => user.interests?.includes(interest));
+                            selectedInterests.some(interest => user.interests?.some((userInterest: string) => userInterest.toLowerCase() === interest));
 
     return matchesSearch && matchesSkills && matchesInterests;
   });
@@ -162,7 +168,7 @@ export default function MentorPage() {
     if (!profile) return "";
     if (profile.role === "mentor") return "Mentee";
     if (profile.role === "mentee") return "Mentor";
-    return "Mentor";
+    return "";
   };
 
   if (loading) {
@@ -241,21 +247,21 @@ export default function MentorPage() {
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                 Expertise ({selectedSkills.length}/5)
               </label>
-              <div className="flex flex-wrap gap-2">
-                {SKILLS_LIST.slice(0, 10).map((skill) => (
-                  <button
-                    key={skill}
-                    onClick={() => toggleMultiSelect(skill, selectedSkills, setSelectedSkills, 5)}
-                    className={`px-3 py-1 rounded-full text-xs font-medium transition ${
-                      selectedSkills.includes(skill)
-                        ? "bg-[#645990] text-white"
-                        : "bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600"
-                    }`}
-                  >
-                    {skill}
-                  </button>
-                ))}
-              </div>
+                  <div className="flex flex-wrap gap-2">
+                    {PROFILE_TAGS.slice(0, 12).map((tag) => (
+                      <button
+                        key={tag.value}
+                        onClick={() => toggleMultiSelect(tag.value, selectedSkills, setSelectedSkills, 5)}
+                        className={`px-3 py-1 rounded-full text-xs font-medium transition ${
+                          selectedSkills.includes(tag.value)
+                            ? "bg-[#645990] text-white"
+                            : "bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600"
+                        }`}
+                      >
+                        {tag.label}
+                      </button>
+                    ))}
+                  </div>
             </div>
 
             {/* Interests Filter */}
@@ -263,21 +269,21 @@ export default function MentorPage() {
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                 Interests ({selectedInterests.length}/5)
               </label>
-              <div className="flex flex-wrap gap-2">
-                {SKILLS_LIST.slice(10, 20).map((interest) => (
-                  <button
-                    key={interest}
-                    onClick={() => toggleMultiSelect(interest, selectedInterests, setSelectedInterests, 5)}
-                    className={`px-3 py-1 rounded-full text-xs font-medium transition ${
-                      selectedInterests.includes(interest)
-                        ? "bg-[#645990] text-white"
-                        : "bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600"
-                    }`}
-                  >
-                    {interest}
-                  </button>
-                ))}
-              </div>
+                  <div className="flex flex-wrap gap-2">
+                    {PROFILE_TAGS.slice(12, 24).map((tag) => (
+                      <button
+                        key={tag.value}
+                        onClick={() => toggleMultiSelect(tag.value, selectedInterests, setSelectedInterests, 5)}
+                        className={`px-3 py-1 rounded-full text-xs font-medium transition ${
+                          selectedInterests.includes(tag.value)
+                            ? "bg-[#645990] text-white"
+                            : "bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600"
+                        }`}
+                      >
+                        {tag.label}
+                      </button>
+                    ))}
+                  </div>
             </div>
           </div>
         )}
@@ -407,11 +413,70 @@ export default function MentorPage() {
               )}
 
               <div className="flex gap-2">
-                <button className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-[#85BCB1] text-white rounded-lg hover:bg-[#645990] transition">
+                {profile?.role === 'mentor' ? (
+                  <button
+                    onClick={() => router.push('/dashboard/match/requests')}
+                    className="flex-1 px-4 py-2 bg-[#645990] hover:bg-[#4f4776] text-white rounded-lg flex items-center justify-center gap-2 transition-colors"
+                  >
+                    <Inbox className="w-4 h-4" />
+                    Review Requests
+                  </button>
+                ) : (() => {
+                  const isPendingToUser = outgoing.some((r: MatchRequest) => r.status === 'pending' && r.receiverId === match.user.uid);
+                  const isIncomingFromUser = incoming.some((r: MatchRequest) => r.status === 'pending' && r.requesterId === match.user.uid);
+                  if (isPendingToUser) {
+                    return (
+                      <button disabled className="flex-1 px-4 py-2 bg-gray-200 text-gray-600 rounded-lg cursor-not-allowed flex items-center justify-center gap-2">
+                        <Send className="w-4 h-4" /> Requested
+                      </button>
+                    );
+                  }
+                  if (isIncomingFromUser) {
+                    return (
+                      <button 
+                        onClick={() => router.push('/dashboard/match/requests')} 
+                        className="flex-1 px-4 py-2 bg-yellow-500 hover:bg-yellow-600 text-white rounded-lg flex items-center justify-center gap-2 transition-colors"
+                      >
+                        <Inbox className="w-4 h-4" /> Respond
+                      </button>
+                    );
+                  }
+                  return (
+                    <button
+                      onClick={async () => {
+                        const user = auth.currentUser;
+                        if (!user) return;
+                        try {
+                          await sendMatchRequest(match.user.uid);
+                          alert('Request sent!');
+                        } catch (e) {
+                          console.error(e);
+                          alert('Failed to send request');
+                        }
+                      }}
+                      className="flex-1 px-4 py-2 bg-[#85BCB1] hover:bg-[#645990] text-white rounded-lg flex items-center justify-center gap-2 transition-colors"
+                    >
+                      <Send className="w-4 h-4" /> Send Request
+                    </button>
+                  );
+                })()}
+                <button 
+                  onClick={() => {
+                    const user = auth.currentUser;
+                    if (!user) return;
+                    router.push(`/dashboard/chats?u=${encodeURIComponent(match.user.uid)}`);
+                  }}
+                  className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-[#85BCB1] text-white rounded-lg hover:bg-[#645990] transition-colors"
+                >
                   <MessageCircle className="w-4 h-4" />
                   Message
                 </button>
-                <button className="flex-1 flex items-center justify-center gap-2 px-4 py-2 border border-[#85BCB1] text-[#85BCB1] rounded-lg hover:bg-[#85BCB1] hover:text-white transition">
+                <button 
+                  onClick={() => {
+                    router.push(`/dashboard/schedule?user=${match.user.uid}&name=${encodeURIComponent(match.user.name || '')}`);
+                  }}
+                  className="flex-1 flex items-center justify-center gap-2 px-4 py-2 border border-[#85BCB1] text-[#85BCB1] rounded-lg hover:bg-[#85BCB1] hover:text-white transition-colors"
+                >
                   <Calendar className="w-4 h-4" />
                   Book Session
                 </button>
