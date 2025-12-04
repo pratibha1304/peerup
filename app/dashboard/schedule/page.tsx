@@ -1,5 +1,6 @@
 "use client";
-import { useEffect, useState } from 'react';
+
+import { useEffect, useState, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
 import {
@@ -9,14 +10,16 @@ import {
   listenToIncomingScheduleRequests,
   listenToConfirmedSchedules,
   listenToSentRequests,
-  getUserProfile,
   type ScheduleRequest,
 } from '@/lib/scheduling';
 import { Timestamp } from 'firebase/firestore';
-import { Calendar, Clock, Check, X, User, CheckCircle2, Phone } from 'lucide-react';
-import { getPartnershipId } from '@/lib/calling';
+import { Calendar, Clock, X, User, CheckCircle2 } from 'lucide-react';
 
-export default function SchedulePage() {
+// ----------------------------------------------------------------------
+// 1. The Main Logic Component (Renamed from SchedulePage to ScheduleContent)
+// ----------------------------------------------------------------------
+
+function ScheduleContent() {
   const { user } = useAuth();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -134,28 +137,6 @@ export default function SchedulePage() {
       return request.receiverName;
     }
     return request.requesterName;
-  };
-
-  const getOtherParticipantId = (request: ScheduleRequest) => {
-    if (request.requesterId === user?.uid) {
-      return request.receiverId;
-    }
-    return request.requesterId;
-  };
-
-  const joinCall = (schedule: ScheduleRequest) => {
-    if (!user) return;
-    const otherId = getOtherParticipantId(schedule);
-    const partnerId = getPartnershipId(user.uid, otherId);
-    // Deterministic caller: lexicographically smaller UID acts as caller
-    const caller = user.uid < otherId;
-    const params = new URLSearchParams({ 
-      partner: partnerId, 
-      other: otherId, 
-      caller: String(caller),
-      video: 'true' // Scheduled meetings are video calls
-    });
-    router.push(`/call?${params.toString()}`);
   };
 
   return (
@@ -287,15 +268,6 @@ export default function SchedulePage() {
                       {schedule.confirmedTime && formatTimestamp(schedule.confirmedTime)}
                     </p>
                   </div>
-                  <div>
-                    <button
-                      onClick={() => joinCall(schedule)}
-                      className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-colors flex items-center gap-2"
-                    >
-                      <Phone className="w-4 h-4" />
-                      Join video call
-                    </button>
-                  </div>
                 </div>
               </div>
             ))
@@ -351,11 +323,11 @@ export default function SchedulePage() {
         <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl p-8 max-w-lg w-full">
             <h3 className="text-2xl font-bold mb-4">
-              Schedule a video call with {selectedUser.name}
+              Schedule a call with {selectedUser.name}
             </h3>
 
             <p className="text-gray-600 mb-6">
-              Propose up to 3 time slots for a video call. {selectedUser.name} will pick one.
+              Propose up to 3 time slots. {selectedUser.name} will pick one.
             </p>
 
             <div className="space-y-4 mb-6">
@@ -400,5 +372,20 @@ export default function SchedulePage() {
         </div>
       )}
     </div>
+  );
+}
+
+// ----------------------------------------------------------------------
+// 2. The New Default Export wrapped in Suspense
+// ----------------------------------------------------------------------
+export default function SchedulePage() {
+  return (
+    <Suspense fallback={
+      <div className="max-w-6xl mx-auto p-6 flex items-center justify-center h-96">
+        <div className="text-gray-500 text-lg">Loading schedule...</div>
+      </div>
+    }>
+      <ScheduleContent />
+    </Suspense>
   );
 }

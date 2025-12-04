@@ -1,6 +1,10 @@
+<<<<<<< HEAD
 "use client";
 
 import { db, auth } from './firebase';
+=======
+import { db } from './firebase';
+>>>>>>> a0ca62188e3511beda6ae985328d2ea36a93fd8e
 import {
   collection,
   doc,
@@ -59,6 +63,7 @@ export async function acceptCall(partnershipId: string) {
 
 export async function declineCall(partnershipId: string) {
   const callRoomRef = doc(db, 'callRooms', partnershipId);
+<<<<<<< HEAD
   const snap = await getDoc(callRoomRef);
   const callData = snap.exists() ? (snap.data() as CallRoom & { outcomeLoggedAt?: any }) : null;
   const alreadyLogged = !!callData?.outcomeLoggedAt;
@@ -75,15 +80,23 @@ export async function declineCall(partnershipId: string) {
   if (callData && !alreadyLogged) {
     await logCallOutcome(partnershipId, callData, 'missed', endedBy);
   }
+=======
+  await updateDoc(callRoomRef, {
+    status: 'ended',
+  });
+>>>>>>> a0ca62188e3511beda6ae985328d2ea36a93fd8e
 }
 
 export async function endCall(partnershipId: string) {
   const callRoomRef = doc(db, 'callRooms', partnershipId);
+<<<<<<< HEAD
   const snap = await getDoc(callRoomRef);
   const callData = snap.exists() ? (snap.data() as CallRoom & { outcomeLoggedAt?: any }) : null;
   const alreadyLogged = !!callData?.outcomeLoggedAt;
   const endedBy = auth.currentUser?.uid || null;
   const outcome: CallOutcome = callData?.status === 'connected' ? 'completed' : 'missed';
+=======
+>>>>>>> a0ca62188e3511beda6ae985328d2ea36a93fd8e
   
   // Delete the ICE candidates subcollections
   const offerCandidatesRef = collection(db, 'callRooms', partnershipId, 'offerCandidates');
@@ -92,6 +105,7 @@ export async function endCall(partnershipId: string) {
   const offerDocs = await getDocs(offerCandidatesRef);
   const answerDocs = await getDocs(answerCandidatesRef);
   
+<<<<<<< HEAD
   await Promise.all(offerDocs.docs.map((d) => deleteDoc(d.ref)));
   await Promise.all(answerDocs.docs.map((d) => deleteDoc(d.ref)));
   
@@ -106,6 +120,14 @@ export async function endCall(partnershipId: string) {
   if (callData && !alreadyLogged) {
     await logCallOutcome(partnershipId, callData, outcome, endedBy);
   }
+=======
+  offerDocs.docs.forEach(async (d) => await deleteDoc(d.ref));
+  answerDocs.docs.forEach(async (d) => await deleteDoc(d.ref));
+  
+  await updateDoc(callRoomRef, {
+    status: 'ended',
+  });
+>>>>>>> a0ca62188e3511beda6ae985328d2ea36a93fd8e
 }
 
 export function listenForIncomingCalls(
@@ -148,12 +170,17 @@ export function createPeerConnection() {
   return new RTCPeerConnection(stunServers);
 }
 
+<<<<<<< HEAD
 export async function startCallLocalStream(withVideo: boolean = false): Promise<MediaStream> {
   // For scheduled meetings: video + audio, for regular calls: audio only
   return await navigator.mediaDevices.getUserMedia({ 
     video: withVideo, 
     audio: true 
   });
+=======
+export async function startCallLocalStream(): Promise<MediaStream> {
+  return await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+>>>>>>> a0ca62188e3511beda6ae985328d2ea36a93fd8e
 }
 
 export function addLocalTracksToPeer(
@@ -248,6 +275,7 @@ export function handleRemoteStream(
   };
 }
 
+<<<<<<< HEAD
 type CallOutcome = 'missed' | 'completed';
 
 async function logCallOutcome(
@@ -274,6 +302,8 @@ async function logCallOutcome(
   });
 }
 
+=======
+>>>>>>> a0ca62188e3511beda6ae985328d2ea36a93fd8e
 export function closePeerConnection(peerConnection: RTCPeerConnection | null) {
   if (peerConnection) {
     peerConnection.close();

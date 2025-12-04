@@ -5,8 +5,16 @@ import { useAuth } from "@/lib/auth-context";
 import { initiateCall, getPartnershipId } from "@/lib/calling";
 import { Users, Filter, Search, Star, MapPin, Calendar, MessageCircle, RefreshCw, User, Heart, Sparkles, Phone, Video, Send, Inbox } from "lucide-react";
 import { sendMatchRequest, listenOutgoingRequests, listenIncomingRequests, MatchRequest } from '@/lib/matchRequests'
+<<<<<<< HEAD
 import { PROFILE_TAGS } from "@/lib/profile-options";
 
+=======
+
+const SKILLS_LIST = [
+  "javascript", "python", "java", "c++", "react", "node.js", "express", "mongodb", "sql", "typescript", "html", "css", "ui/ux", "design", "marketing", "business", "data science", "machine learning", "ai", "cloud", "aws", "azure", "gcp", "devops", "docker", "kubernetes", "git", "figma", "photoshop", "illustrator", "writing", "public speaking", "photography", "music", "finance", "accounting", "product management", "project management", "leadership", "teamwork", "problem solving", "critical thinking", "communication", "sales", "content creation", "seo", "social media", "video editing", "animation", "cybersecurity", "blockchain", "solidity", "flutter", "android", "ios", "swift", "kotlin", "go", "ruby", "php", "laravel", "django", "flask", "r", "matlab", "statistics", "research", "biology", "chemistry", "physics", "mathematics", "economics", "psychology", "education", "teaching", "coaching", "mentoring", "sports", "fitness", "yoga", "meditation", "health", "nutrition", "cooking", "baking", "languages", "french", "spanish", "german", "hindi", "chinese", "japanese", "korean", "arabic", "travel", "gaming", "esports", "volunteering", "sustainability", "environment", "robotics", "electronics", "hardware", "networking", "testing", "qa", "customer support", "hr", "recruitment", "legal", "law", "medicine", "nursing", "veterinary", "architecture", "interior design", "fashion", "event planning", "journalism", "blogging", "podcasting", "comedy", "acting", "film", "theatre", "dance", "painting", "sculpture", "calligraphy", "crafts", "diy", "gardening", "parenting", "pets", "astrology", "spirituality", "philosophy", "history", "politics", "international relations"
+];
+
+>>>>>>> a0ca62188e3511beda6ae985328d2ea36a93fd8e
 interface MatchResult {
   user: any;
   score: number;
@@ -44,12 +52,17 @@ export default function MatchPage() {
   // listen to requests
   useEffect(() => {
     if (!user) return
+<<<<<<< HEAD
     const unsubOut = listenOutgoingRequests(user.uid, (reqs) => {
       setOutgoing(reqs)
     })
     const unsubIn = listenIncomingRequests(user.uid, (reqs) => {
       setIncoming(reqs)
     })
+=======
+    const unsubOut = listenOutgoingRequests(user.uid, setOutgoing)
+    const unsubIn = listenIncomingRequests(user.uid, setIncoming)
+>>>>>>> a0ca62188e3511beda6ae985328d2ea36a93fd8e
     return () => {
       unsubOut()
       unsubIn()
@@ -97,17 +110,28 @@ export default function MatchPage() {
 
   const filteredMatches = matches.filter((match) => {
     const user = match.user;
+<<<<<<< HEAD
     const lowerSearch = searchTerm.toLowerCase();
     const matchesSearch = user.name?.toLowerCase().includes(lowerSearch) ||
                          user.skills?.some((skill: string) => skill.toLowerCase().includes(lowerSearch)) ||
                          user.interests?.some((interest: string) => interest.toLowerCase().includes(lowerSearch)) ||
                          user.location?.toLowerCase().includes(lowerSearch);
+=======
+    const matchesSearch = user.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         user.skills?.some((skill: string) => skill.toLowerCase().includes(searchTerm.toLowerCase())) ||
+                         user.interests?.some((interest: string) => interest.toLowerCase().includes(searchTerm.toLowerCase())) ||
+                         user.location?.toLowerCase().includes(searchTerm.toLowerCase());
+>>>>>>> a0ca62188e3511beda6ae985328d2ea36a93fd8e
     
     const matchesSkills = selectedSkills.length === 0 || 
                          selectedSkills.some(skill => user.skills?.some((userSkill: string) => userSkill.toLowerCase() === skill));
     
     const matchesInterests = selectedInterests.length === 0 || 
+<<<<<<< HEAD
                            selectedInterests.some(interest => user.interests?.some((userInterest: string) => userInterest.toLowerCase() === interest));
+=======
+                           selectedInterests.some(interest => user.interests?.includes(interest));
+>>>>>>> a0ca62188e3511beda6ae985328d2ea36a93fd8e
     
     return matchesSearch && matchesSkills && matchesInterests;
   });
@@ -242,17 +266,30 @@ export default function MatchPage() {
                     Skills ({selectedSkills.length}/5)
                   </label>
                   <div className="flex flex-wrap gap-2">
+<<<<<<< HEAD
                     {PROFILE_TAGS.slice(0, 20).map((tag) => (
                       <button
                         key={tag.value}
                         onClick={() => toggleMultiSelect(tag.value, selectedSkills, setSelectedSkills, 5)}
                         className={`px-3 py-1 rounded-full text-sm transition-colors ${
                           selectedSkills.includes(tag.value)
+=======
+                    {SKILLS_LIST.slice(0, 20).map((skill) => (
+                      <button
+                        key={skill}
+                        onClick={() => toggleMultiSelect(skill, selectedSkills, setSelectedSkills, 5)}
+                        className={`px-3 py-1 rounded-full text-sm transition-colors ${
+                          selectedSkills.includes(skill)
+>>>>>>> a0ca62188e3511beda6ae985328d2ea36a93fd8e
                             ? 'bg-indigo-500 text-white'
                             : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                         }`}
                       >
+<<<<<<< HEAD
                         {tag.label}
+=======
+                        {skill}
+>>>>>>> a0ca62188e3511beda6ae985328d2ea36a93fd8e
                       </button>
                     ))}
                   </div>
@@ -263,17 +300,30 @@ export default function MatchPage() {
                     Interests ({selectedInterests.length}/5)
                   </label>
                   <div className="flex flex-wrap gap-2">
+<<<<<<< HEAD
                     {PROFILE_TAGS.slice(20, 40).map((tag) => (
                       <button
                         key={tag.value}
                         onClick={() => toggleMultiSelect(tag.value, selectedInterests, setSelectedInterests, 5)}
                         className={`px-3 py-1 rounded-full text-sm transition-colors ${
                           selectedInterests.includes(tag.value)
+=======
+                    {['web development', 'mobile development', 'data science', 'machine learning', 'startups', 'design', 'gaming', 'music', 'sports', 'travel'].map((interest) => (
+                      <button
+                        key={interest}
+                        onClick={() => toggleMultiSelect(interest, selectedInterests, setSelectedInterests, 5)}
+                        className={`px-3 py-1 rounded-full text-sm transition-colors ${
+                          selectedInterests.includes(interest)
+>>>>>>> a0ca62188e3511beda6ae985328d2ea36a93fd8e
                             ? 'bg-pear text-black'
                             : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                         }`}
                       >
+<<<<<<< HEAD
                         {tag.label}
+=======
+                        {interest}
+>>>>>>> a0ca62188e3511beda6ae985328d2ea36a93fd8e
                       </button>
                     ))}
                   </div>
@@ -406,6 +456,7 @@ export default function MatchPage() {
 
                   {/* Action: Send/Requested/Respond only on Find page */}
                   <div className="flex gap-3">
+<<<<<<< HEAD
                     {user.role === 'mentor' ? (
                       <button
                         onClick={() => router.push('/dashboard/match/requests')}
@@ -423,6 +474,12 @@ export default function MatchPage() {
                       const isIncomingFromUser = incoming.some(r => r.status === 'pending' && r.requesterId === match.user.uid)
                       
                       if (hasOutgoingRequest) {
+=======
+                    {(() => {
+                      const isPendingToUser = outgoing.some(r => r.status === 'pending' && r.receiverId === match.user.uid)
+                      const isIncomingFromUser = incoming.some(r => r.status === 'pending' && r.requesterId === match.user.uid)
+                      if (isPendingToUser) {
+>>>>>>> a0ca62188e3511beda6ae985328d2ea36a93fd8e
                         return (
                           <button disabled className="px-4 py-2 bg-gray-200 text-gray-600 rounded-xl cursor-not-allowed flex items-center gap-2">
                             <Send className="w-4 h-4" /> Requested
@@ -442,7 +499,11 @@ export default function MatchPage() {
                             if (!user) return;
                             try {
                               await sendMatchRequest(match.user.uid)
+<<<<<<< HEAD
                               // State will update via listener
+=======
+                              alert('Request sent!')
+>>>>>>> a0ca62188e3511beda6ae985328d2ea36a93fd8e
                             } catch (e) {
                               console.error(e)
                               alert('Failed to send request')

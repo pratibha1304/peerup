@@ -2,9 +2,13 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
+<<<<<<< HEAD
 import { getOrCreateChat, listenToMessages, listenToUserChats, sendMessage, markChatAsRead } from '@/lib/chat';
 import { db } from '@/lib/firebase';
 import { doc, getDoc } from 'firebase/firestore';
+=======
+import { getOrCreateChat, listenToMessages, listenToUserChats, sendMessage } from '@/lib/chat';
+>>>>>>> a0ca62188e3511beda6ae985328d2ea36a93fd8e
 
 export default function ChatsPage() {
   const { user } = useAuth();
@@ -13,7 +17,10 @@ export default function ChatsPage() {
   const [messages, setMessages] = useState<any[]>([]);
   const [chats, setChats] = useState<any[]>([]);
   const [input, setInput] = useState('');
+<<<<<<< HEAD
   const [userNames, setUserNames] = useState<Record<string, string>>({});
+=======
+>>>>>>> a0ca62188e3511beda6ae985328d2ea36a93fd8e
 
   const otherUidFromQuery = params.get('u');
 
@@ -23,6 +30,7 @@ export default function ChatsPage() {
     return () => unsub();
   }, [user]);
 
+<<<<<<< HEAD
   // Load user names for chat participants
   useEffect(() => {
     const loadNames = async () => {
@@ -59,6 +67,8 @@ export default function ChatsPage() {
     }
   }, [chats, user, userNames]);
 
+=======
+>>>>>>> a0ca62188e3511beda6ae985328d2ea36a93fd8e
   useEffect(() => {
     if (!user) return;
     if (otherUidFromQuery) {
@@ -78,6 +88,7 @@ export default function ChatsPage() {
     setInput('');
   };
 
+<<<<<<< HEAD
   const openChat = (chatId: string) => {
     setCurrentChatId(chatId);
     if (user) {
@@ -91,11 +102,14 @@ export default function ChatsPage() {
     }
   }, [user, currentChatId]);
 
+=======
+>>>>>>> a0ca62188e3511beda6ae985328d2ea36a93fd8e
   return (
     <div className="max-w-5xl mx-auto p-6 grid grid-cols-1 md:grid-cols-3 gap-6">
       <div className="md:col-span-1 bg-white rounded-2xl border p-4 h-[70vh] overflow-y-auto">
         <h2 className="font-semibold mb-3">Your Chats</h2>
         <div className="space-y-2">
+<<<<<<< HEAD
           {chats.map((c) => {
             const otherId = (c.participants || []).find((p: string) => p !== user?.uid) || '';
             const otherName = userNames[otherId] || otherId;
@@ -120,6 +134,18 @@ export default function ChatsPage() {
               </button>
             );
           })}
+=======
+          {chats.map((c) => (
+            <button
+              key={c.id}
+              onClick={() => setCurrentChatId(c.id)}
+              className={`w-full text-left px-3 py-2 rounded-xl border ${currentChatId === c.id ? 'bg-indigo-50 border-indigo-200' : 'border-gray-200 hover:bg-gray-50'}`}
+            >
+              <div className="text-sm text-gray-800">{c.id.replaceAll('_', ' · ')}</div>
+              <div className="text-xs text-gray-500 truncate">{c.lastMessage || 'No messages yet'}</div>
+            </button>
+          ))}
+>>>>>>> a0ca62188e3511beda6ae985328d2ea36a93fd8e
           {chats.length === 0 && (
             <div className="text-sm text-gray-500">No chats yet. Start one from Matches.</div>
           )}

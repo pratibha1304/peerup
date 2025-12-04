@@ -87,6 +87,7 @@ service cloud.firestore {
         allow read, create: if request.auth != null && isParticipant(matchId);
 
         // Update allowed if participant AND (buddy match OR this user is mentee)
+<<<<<<< HEAD
         allow update: if request.auth != null && isParticipant(matchId);
       }
     }
@@ -98,6 +99,15 @@ service cloud.firestore {
       allow update, delete: if false;
     }
 
+=======
+        allow update: if request.auth != null && isParticipant(matchId) && (
+          get(/databases/$(database)/documents/matches/$(matchId)).data.matchType == 'buddy' ||
+          request.auth.uid == get(/databases/$(database)/documents/matches/$(matchId)).data.menteeId
+        );
+      }
+    }
+
+>>>>>>> a0ca62188e3511beda6ae985328d2ea36a93fd8e
     // --- MATCH REQUESTS ---
     match /matchRequests/{requestId} {
       // Create allowed only by requester for themselves

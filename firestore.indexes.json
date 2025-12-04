@@ -27,6 +27,7 @@
           "order": "ASCENDING"
         }
       ]
+<<<<<<< HEAD
     },
     {
       "collectionGroup": "callLogs",
@@ -45,6 +46,8 @@
           "order": "ASCENDING"
         }
       ]
+=======
+>>>>>>> a0ca62188e3511beda6ae985328d2ea36a93fd8e
     }
   ],
   "fieldOverrides": []

@@ -9,6 +9,7 @@ import {
 } from 'firebase/auth';
 import { doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
 import { auth, db } from './firebase';
+<<<<<<< HEAD
 
 type UserSettings = {
   emailUpdates: boolean
@@ -18,6 +19,8 @@ type UserSettings = {
   profileVisibility: 'community' | 'matches-only'
   timezone: string
 }
+=======
+>>>>>>> a0ca62188e3511beda6ae985328d2ea36a93fd8e
 
 interface User {
   uid: string;

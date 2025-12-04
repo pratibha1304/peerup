@@ -1,7 +1,10 @@
 "use client";
 import { useEffect, useState } from 'react';
 import { useAuth } from '@/lib/auth-context';
+<<<<<<< HEAD
 import { doc, getDoc } from 'firebase/firestore';
+=======
+>>>>>>> a0ca62188e3511beda6ae985328d2ea36a93fd8e
 import { db } from '@/lib/firebase';
 import { collection, query, where, onSnapshot } from 'firebase/firestore';
 import Link from 'next/link';
@@ -16,7 +19,10 @@ type Match = {
 export default function GoalsPage() {
   const { user } = useAuth();
   const [matches, setMatches] = useState<Match[]>([]);
+<<<<<<< HEAD
   const [nameByUserId, setNameByUserId] = useState<Record<string, string>>({});
+=======
+>>>>>>> a0ca62188e3511beda6ae985328d2ea36a93fd8e
 
   useEffect(() => {
     if (!user) return;
@@ -29,6 +35,7 @@ export default function GoalsPage() {
     return () => unsub();
   }, [user]);
 
+<<<<<<< HEAD
   useEffect(() => {
     const loadNames = async () => {
       const toFetch = new Set<string>();
@@ -58,6 +65,8 @@ export default function GoalsPage() {
     }
   }, [matches]);
 
+=======
+>>>>>>> a0ca62188e3511beda6ae985328d2ea36a93fd8e
   if (!user) return <div className="p-6">Please sign in.</div>;
 
   return (
@@ -66,6 +75,7 @@ export default function GoalsPage() {
       <p className="text-sm text-muted-foreground mb-4">Select a partnership to manage shared goals.</p>
 
       <div className="space-y-3">
+<<<<<<< HEAD
         {matches.map((m) => {
           const otherId = (m.participants || []).find((p) => p !== user?.uid) || '';
           const otherName = nameByUserId[otherId] || otherId;
@@ -79,6 +89,14 @@ export default function GoalsPage() {
             </Link>
           );
         })}
+=======
+        {matches.map((m) => (
+          <Link key={m.id} href={`/dashboard/match/${m.id}/goals`} className="block rounded-xl border p-4 hover:bg-accent">
+            <div className="font-medium">{m.id}</div>
+            <div className="text-xs text-muted-foreground">Type: {m.matchType ?? 'unknown'}{m.matchType === 'mentor' && m.menteeId ? ` · mentee: ${m.menteeId}` : ''}</div>
+          </Link>
+        ))}
+>>>>>>> a0ca62188e3511beda6ae985328d2ea36a93fd8e
         {matches.length === 0 && (
           <div className="text-gray-500">No active partnerships found.</div>
         )}

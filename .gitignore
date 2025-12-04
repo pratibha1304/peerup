@@ -25,3 +25,15 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts"peerup-64fbf-firebase-adminsdk-fbsvc-688bc91130.json" 
+# Folders
+node_modules/
+dist/
+build/
+
+# Firebase / Environment files with secret keys
+.env
+firebase.config.js
+google-services.json
+
+# Log files
+*.log
