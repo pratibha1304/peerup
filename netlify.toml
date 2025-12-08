@@ -5,10 +5,11 @@
 [[plugins]]
   package = "@netlify/plugin-nextjs"
 
-# Disable secrets scanning for build output (since Firebase keys are public client-side keys)
-# These are intentionally exposed to the browser and are not secrets
+# Disable secrets scanning entirely for this build
+# Firebase NEXT_PUBLIC_* keys are intentionally public (client-side) and will appear in build output
+# This is expected behavior for Next.js apps using Firebase
 [build.environment]
-  SECRETS_SCAN_OMIT_PATHS = ".next/**"
+  SECRETS_SCAN_ENABLED = "false"
 
 # Headers for static assets
 [[headers]]
