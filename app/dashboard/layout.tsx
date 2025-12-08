@@ -25,13 +25,13 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       )}
       
       {/* Mobile Sidebar - Shown when menu is open */}
-      <div className={`fixed left-0 top-0 h-screen z-50 transition-transform duration-300 md:hidden ${
+      <aside className={`fixed left-0 top-0 h-screen w-64 z-50 transition-transform duration-300 md:hidden bg-card shadow-xl border-r border-border ${
         mobileMenuOpen ? "translate-x-0" : "-translate-x-full"
       }`}>
         <Sidebar />
-      </div>
+      </aside>
 
-      <main className="flex-1 ml-0 md:ml-64 p-4 md:p-6 overflow-y-auto w-full min-w-0">
+      <main className="flex-1 ml-0 md:ml-64 p-4 md:p-6 overflow-y-auto w-full min-w-0 max-w-full">
         <div className="flex items-center justify-between mb-6">
           <Button
             variant="ghost"
