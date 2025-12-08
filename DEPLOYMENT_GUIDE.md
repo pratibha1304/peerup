@@ -66,7 +66,16 @@ Vercel is the easiest platform for Next.js applications. Follow these steps:
 
 ### Step 1: Prepare Your Repository
 
-Same as Vercel - ensure code is committed and pushed to GitHub.
+1. **Remove hardcoded secrets** (Already done in `lib/firebase.js`)
+   - ✅ Hardcoded Firebase keys have been removed
+   - ✅ Environment variables are now required
+
+2. **Commit and push changes:**
+   ```bash
+   git add .
+   git commit -m "Remove hardcoded Firebase keys for Netlify deployment"
+   git push origin main
+   ```
 
 ### Step 2: Deploy to Netlify
 
@@ -78,44 +87,74 @@ Same as Vercel - ensure code is committed and pushed to GitHub.
    - Select your PeerUP repository
    - Netlify will auto-detect Next.js
 
-3. **Build Settings**
-   - **Build command:** `npm run build`
-   - **Publish directory:** `.next`
+3. **Build Settings** (The `netlify.toml` file is already configured)
+   - **Build command:** `npm run build` (auto-detected from `netlify.toml`)
+   - **Publish directory:** `.next` (auto-detected from `netlify.toml`)
    - **Base directory:** (leave empty if root)
 
-4. **Environment Variables**
-   - Go to Site settings → Environment variables
-   - Add all variables from `.env.local` (same as Vercel)
+4. **Environment Variables** (CRITICAL - Do this BEFORE deploying)
+   - Click "Show advanced" → "New variable"
+   - Add ALL these variables (one by one):
+     ```
+     NEXT_PUBLIC_FIREBASE_API_KEY=your_actual_api_key
+     NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=your-project.firebaseapp.com
+     NEXT_PUBLIC_FIREBASE_PROJECT_ID=your-project-id
+     NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=your-project.appspot.com
+     NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=your_sender_id
+     NEXT_PUBLIC_FIREBASE_APP_ID=your_app_id
+     NEXTAUTH_SECRET=your_nextauth_secret
+     NEXTAUTH_URL=https://your-app.netlify.app (update after first deploy)
+     GOOGLE_GEMINI_API_KEY=your_gemini_api_key
+     ```
+   - **Important:** Set these BEFORE clicking "Deploy site"
 
-5. **Deploy**
+5. **Configure Secrets Scanning** (To prevent false positives)
+   - Go to Site settings → Build & deploy → Environment
+   - Scroll to "Secrets scanning"
+   - Add to "Omit paths": `.next/**`
+   - Or add environment variable: `SECRETS_SCAN_OMIT_PATHS=.next/**`
+   - This tells Netlify to ignore the build output (where Firebase keys are bundled)
+
+6. **Deploy**
    - Click "Deploy site"
-   - Wait for build to complete
+   - Wait for build to complete (first build may take 2-3 minutes)
 
-### Step 3: Configure Next.js Plugin
+### Step 3: Fix Secrets Scanning Error (If it still occurs)
 
-Netlify requires a special plugin for Next.js:
+If you still see secrets scanning errors:
 
-1. **Create `netlify.toml` in project root:**
-   ```toml
-   [build]
-     command = "npm run build"
-     publish = ".next"
+1. **Option A: Disable secrets scanning for build output**
+   - Go to Site settings → Build & deploy → Environment
+   - Add environment variable:
+     - Key: `SECRETS_SCAN_OMIT_PATHS`
+     - Value: `.next/**`
+   - Redeploy
 
-   [[plugins]]
-     package = "@netlify/plugin-nextjs"
-   ```
+2. **Option B: Configure in netlify.toml** (Already done)
+   - The `netlify.toml` file already includes this configuration
+   - Make sure it's committed to your repository
 
-2. **Or install via Netlify UI:**
-   - Go to Site settings → Plugins
-   - Search for "Next.js" and install
+3. **Option C: Disable secrets scanning entirely** (Not recommended)
+   - Go to Site settings → Build & deploy → Environment
+   - Add environment variable:
+     - Key: `SECRETS_SCAN_ENABLED`
+     - Value: `false`
 
 ### Step 4: Post-Deployment
 
 1. **Update Firebase Authorized Domains**
-   - Add your Netlify domain (e.g., `your-app.netlify.app`)
+   - Go to [Firebase Console](https://console.firebase.google.com/)
+   - Select your project
+   - Go to Authentication → Settings → Authorized domains
+   - Click "Add domain"
+   - Add: `your-app.netlify.app` (replace with your actual Netlify domain)
 
 2. **Update NEXTAUTH_URL**
-   - Set to your Netlify URL
+   - Go to Netlify Site settings → Environment variables
+   - Find `NEXTAUTH_URL`
+   - Update value to: `https://your-app.netlify.app` (your actual URL)
+   - Click "Save"
+   - Trigger a new deploy (Deploys → Trigger deploy → Deploy site)
 
 ---
 
@@ -151,6 +190,17 @@ npm run build
 - WebRTC requires HTTPS (automatically provided by Vercel/Netlify)
 - Ensure STUN servers are accessible
 - Check browser console for WebRTC errors
+
+### Issue 6: Netlify Secrets Scanning Error
+**Error:** "Secrets scanning detected secrets in files during build"
+**Solution:**
+1. **Ensure hardcoded keys are removed** (already fixed in `lib/firebase.js`)
+2. **Set environment variables in Netlify** BEFORE deploying
+3. **Configure secrets scanning to ignore build output:**
+   - Add environment variable: `SECRETS_SCAN_OMIT_PATHS=.next/**`
+   - Or use the `netlify.toml` configuration (already included)
+4. **Redeploy** after making changes
+5. **Note:** Firebase `NEXT_PUBLIC_*` keys are intentionally public (client-side), but Netlify's scanner flags them. The configuration above tells Netlify to ignore the bundled output.
 
 ---
 
