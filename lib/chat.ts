@@ -12,10 +12,7 @@ import {
   serverTimestamp,
   updateDoc,
   Timestamp,
-<<<<<<< HEAD
   increment,
-=======
->>>>>>> a0ca62188e3511beda6ae985328d2ea36a93fd8e
 } from 'firebase/firestore';
 
 export type Chat = {
@@ -24,11 +21,8 @@ export type Chat = {
   lastMessage?: string;
   lastMessageAt?: Timestamp; // Legacy field for backward compatibility
   lastMessageTimestamp?: Timestamp;
-<<<<<<< HEAD
   lastMessageSenderId?: string;
   unreadCounts?: Record<string, number>;
-=======
->>>>>>> a0ca62188e3511beda6ae985328d2ea36a93fd8e
 };
 
 export type ChatMessage = {
@@ -54,13 +48,10 @@ export async function getOrCreateChat(currentUid: string, otherUid: string) {
       participants: [currentUid, otherUid],
       lastMessage: '',
       lastMessageAt: serverTimestamp(),
-<<<<<<< HEAD
       unreadCounts: {
         [currentUid]: 0,
         [otherUid]: 0,
       },
-=======
->>>>>>> a0ca62188e3511beda6ae985328d2ea36a93fd8e
     });
   }
   return chatId;
@@ -75,7 +66,6 @@ export async function sendMessage(chatId: string, senderId: string, text: string
   });
 
   const chatRef = doc(db, 'chats', chatId);
-<<<<<<< HEAD
   const chatSnap = await getDoc(chatRef);
   const chatData = chatSnap.exists() ? (chatSnap.data() as Chat) : null;
   const participants = chatData?.participants || [];
@@ -88,11 +78,6 @@ export async function sendMessage(chatId: string, senderId: string, text: string
     lastMessageTimestamp: serverTimestamp(),
     lastMessageSenderId: senderId,
     ...unreadUpdates,
-=======
-  await updateDoc(chatRef, {
-    lastMessage: text,
-    lastMessageTimestamp: serverTimestamp(),
->>>>>>> a0ca62188e3511beda6ae985328d2ea36a93fd8e
   });
 }
 
@@ -121,7 +106,6 @@ export function listenToUserChats(currentUid: string, cb: (chats: Chat[]) => voi
   });
 }
 
-<<<<<<< HEAD
 export async function markChatAsRead(chatId: string, uid: string) {
   const chatRef = doc(db, 'chats', chatId);
   await updateDoc(chatRef, {
@@ -129,6 +113,4 @@ export async function markChatAsRead(chatId: string, uid: string) {
   });
 }
 
-=======
->>>>>>> a0ca62188e3511beda6ae985328d2ea36a93fd8e
 

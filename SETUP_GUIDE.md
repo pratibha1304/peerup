@@ -35,7 +35,6 @@ NEXT_PUBLIC_FIREBASE_APP_ID=your_app_id
 NEXTAUTH_SECRET=your_nextauth_secret_here
 NEXTAUTH_URL=http://localhost:3000
 
-<<<<<<< HEAD
 # Google Gemini/Vertex AI (for AI goal breakdown)
 # Option 1: Use Gemini API directly (simpler, recommended)
 VERTEX_AI_API_KEY=your_gemini_api_key_here
@@ -53,12 +52,6 @@ GEMINI_API_KEY=your_gemini_api_key_here
 2. Create a new API key
 3. Copy it to your `.env.local` file as `VERTEX_AI_API_KEY`
 
-=======
-# Google Gemini API (for AI roadmap)
-GOOGLE_GEMINI_API_KEY=your_gemini_api_key_here
-```
-
->>>>>>> a0ca62188e3511beda6ae985328d2ea36a93fd8e
 ### 3. Generate NextAuth Secret
 
 Run this command to generate a secure secret:
@@ -74,7 +67,6 @@ openssl rand -base64 32
 - **Email/Password**: Traditional authentication
 - **User Profiles**: Complete profile management
 
-<<<<<<< HEAD
 ### Voice Calling
 - **Voice-only calls**: Audio-only communication between matched users
 - **WebRTC integration**: Real-time peer-to-peer connection
@@ -92,8 +84,6 @@ openssl rand -base64 32
 - **Task management**: Check off completed tasks
 - **Role-based permissions**: Mentees can check tasks in mentor relationships
 
-=======
->>>>>>> a0ca62188e3511beda6ae985328d2ea36a93fd8e
 ### AI Matching Engine
 - **Smart Algorithm**: Uses Jaccard similarity for skills/interests
 - **Role-based Matching**: 
@@ -139,7 +129,6 @@ openssl rand -base64 32
 4. **Ranking**: Sorts by match quality
 5. **Filtering**: Applies user preferences
 
-<<<<<<< HEAD
 ### Mentor/Mentee Workflow
 - **Role-based matching**: Mentors find mentees and vice versa
 - **Match requests**: Send connection requests
@@ -148,8 +137,6 @@ openssl rand -base64 32
 - **Scheduling**: Book mentoring sessions
 - **Messaging**: Direct communication
 
-=======
->>>>>>> a0ca62188e3511beda6ae985328d2ea36a93fd8e
 ## 🚀 Next Steps
 
 1. **Configure Firebase**: Add your project credentials

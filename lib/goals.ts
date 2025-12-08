@@ -12,13 +12,10 @@ import {
   increment,
   getDocs,
   limit,
-<<<<<<< HEAD
   runTransaction,
   where,
   updateDoc,
   deleteDoc,
-=======
->>>>>>> a0ca62188e3511beda6ae985328d2ea36a93fd8e
 } from 'firebase/firestore'
 
 export type Goal = {
@@ -35,7 +32,6 @@ export type Goal = {
 export type Task = {
   id: string
   text: string
-<<<<<<< HEAD
   details?: string
   durationDays?: number | null
   isComplete: boolean
@@ -43,12 +39,6 @@ export type Task = {
   unlocked?: boolean
   completedBy?: Record<string, boolean>
   createdAt?: any
-=======
-  isComplete: boolean
-  order: number
-  createdAt?: any
-  completedBy?: string | null
->>>>>>> a0ca62188e3511beda6ae985328d2ea36a93fd8e
 }
 
 export function listenToGoals(partnershipId: string, cb: (goals: Goal[]) => void): Unsubscribe {
@@ -71,11 +61,7 @@ export function listenToTasks(partnershipId: string, goalId: string, cb: (tasks:
 
 export async function addGoal(partnershipId: string, title: string, description?: string) {
   const goalsRef = collection(db, 'matches', partnershipId, 'goals')
-<<<<<<< HEAD
   const docRef = await addDoc(goalsRef, {
-=======
-  await addDoc(goalsRef, {
->>>>>>> a0ca62188e3511beda6ae985328d2ea36a93fd8e
     title: title.trim(),
     description: description?.trim() || '',
     status: 'in-progress',
@@ -84,7 +70,6 @@ export async function addGoal(partnershipId: string, title: string, description?
     createdBy: auth.currentUser?.uid || 'unknown',
     createdAt: serverTimestamp(),
   })
-<<<<<<< HEAD
 
   return docRef.id
 }
@@ -101,11 +86,6 @@ export async function addTask(
   taskText: string,
   options: AddTaskOptions = {}
 ) {
-=======
-}
-
-export async function addTask(partnershipId: string, goalId: string, taskText: string) {
->>>>>>> a0ca62188e3511beda6ae985328d2ea36a93fd8e
   const batch = writeBatch(db)
   const goalRef = doc(db, 'matches', partnershipId, 'goals', goalId)
   const newTaskRef = doc(collection(goalRef, 'tasks'))
@@ -120,21 +100,16 @@ export async function addTask(partnershipId: string, goalId: string, taskText: s
     isComplete: false,
     createdAt: serverTimestamp(),
     order: nextOrder,
-<<<<<<< HEAD
     unlocked: options.unlocked ?? nextOrder === 1,
     completedBy: {},
     details: options.details?.trim() || '',
     durationDays: options.durationDays ?? null,
-=======
-    completedBy: null,
->>>>>>> a0ca62188e3511beda6ae985328d2ea36a93fd8e
   })
 
   batch.update(goalRef, { taskCount: increment(1) })
   await batch.commit()
 }
 
-<<<<<<< HEAD
 export async function updateGoal(
   partnershipId: string,
   goalId: string,
@@ -304,20 +279,3 @@ export async function toggleTask(
     }
   })
 }
-=======
-export async function toggleTask(partnershipId: string, goalId: string, taskId: string, newStatus: boolean) {
-  const batch = writeBatch(db)
-  const goalRef = doc(db, 'matches', partnershipId, 'goals', goalId)
-  const taskRef = doc(goalRef, 'tasks', taskId)
-
-  batch.update(taskRef, {
-    isComplete: newStatus,
-    completedBy: newStatus ? (auth.currentUser?.uid || null) : null,
-  })
-
-  batch.update(goalRef, { completedTaskCount: increment(newStatus ? 1 : -1) })
-  await batch.commit()
-}
-
-
->>>>>>> a0ca62188e3511beda6ae985328d2ea36a93fd8e

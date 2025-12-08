@@ -1,7 +1,6 @@
 "use client"
 
 import { useEffect, useMemo, useState } from 'react'
-<<<<<<< HEAD
 import {
   Goal,
   Task,
@@ -16,16 +15,12 @@ import {
   updateTask,
   clearGoalTasks,
 } from '@/lib/goals'
-=======
-import { Goal, Task, listenToGoals, listenToTasks, addGoal, addTask, toggleTask } from '@/lib/goals'
->>>>>>> a0ca62188e3511beda6ae985328d2ea36a93fd8e
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 
 type GoalsViewProps = {
   partnershipId: string
-<<<<<<< HEAD
   currentUserId?: string | null
   participants?: string[]
 }
@@ -35,20 +30,11 @@ export default function GoalsView({
   currentUserId,
   participants = [],
 }: GoalsViewProps) {
-=======
-  matchType?: 'buddy' | 'mentor'
-  menteeId?: string | null
-  currentUserId?: string | null
-}
-
-export default function GoalsView({ partnershipId, matchType, menteeId, currentUserId }: GoalsViewProps) {
->>>>>>> a0ca62188e3511beda6ae985328d2ea36a93fd8e
   const [goals, setGoals] = useState<Goal[]>([])
   const [activeGoalId, setActiveGoalId] = useState<string | null>(null)
   const [tasks, setTasks] = useState<Task[]>([])
   const [isAddGoalOpen, setIsAddGoalOpen] = useState(false)
   const [newGoalTitle, setNewGoalTitle] = useState('')
-<<<<<<< HEAD
   const [newGoalDescription, setNewGoalDescription] = useState('')
   const [newTaskText, setNewTaskText] = useState('')
   const [isGeneratingTasks, setIsGeneratingTasks] = useState(false)
@@ -61,9 +47,6 @@ export default function GoalsView({ partnershipId, matchType, menteeId, currentU
   const [taskForm, setTaskForm] = useState({ text: '', details: '', durationDays: '' })
   const [regenTaskCount, setRegenTaskCount] = useState(5)
   const [isRegenerating, setIsRegenerating] = useState(false)
-=======
-  const [newTaskText, setNewTaskText] = useState('')
->>>>>>> a0ca62188e3511beda6ae985328d2ea36a93fd8e
 
   useEffect(() => {
     const unsub = listenToGoals(partnershipId, setGoals)
@@ -77,7 +60,6 @@ export default function GoalsView({ partnershipId, matchType, menteeId, currentU
   }, [partnershipId, activeGoalId])
 
   const activeGoal = useMemo(() => goals.find((g) => g.id === activeGoalId) || null, [goals, activeGoalId])
-<<<<<<< HEAD
 
   const handleCreateGoal = async (autoGenerateTasks = false) => {
     if (!newGoalTitle.trim()) return
@@ -147,19 +129,6 @@ export default function GoalsView({ partnershipId, matchType, menteeId, currentU
     } finally {
       setIsGeneratingTasks(false)
     }
-=======
-  const canToggleTasks = useMemo(() => {
-    if (matchType === 'buddy') return true
-    if (matchType === 'mentor') return currentUserId != null && currentUserId === menteeId
-    return true
-  }, [matchType, currentUserId, menteeId])
-
-  const handleCreateGoal = async () => {
-    if (!newGoalTitle.trim()) return
-    await addGoal(partnershipId, newGoalTitle)
-    setNewGoalTitle('')
-    setIsAddGoalOpen(false)
->>>>>>> a0ca62188e3511beda6ae985328d2ea36a93fd8e
   }
 
   const handleAddTask = async () => {
@@ -168,7 +137,6 @@ export default function GoalsView({ partnershipId, matchType, menteeId, currentU
     setNewTaskText('')
   }
 
-<<<<<<< HEAD
   const openGoalEditor = (goal: Goal) => {
     setGoalBeingEdited(goal)
     setGoalFormTitle(goal.title)
@@ -281,8 +249,6 @@ export default function GoalsView({ partnershipId, matchType, menteeId, currentU
     }
   }
 
-=======
->>>>>>> a0ca62188e3511beda6ae985328d2ea36a93fd8e
   return (
     <div className="max-w-4xl mx-auto p-6">
       <div className="flex items-center justify-between mb-6">
@@ -295,11 +261,7 @@ export default function GoalsView({ partnershipId, matchType, menteeId, currentU
         {goals.map((g) => {
           const pct = g.taskCount > 0 ? Math.round((g.completedTaskCount / g.taskCount) * 100) : 0
           return (
-<<<<<<< HEAD
             <button key={g.id} className="text-left rounded-xl border p-4 hover:bg-gray-50 transition-colors" onClick={() => setActiveGoalId(g.id)}>
-=======
-            <button key={g.id} className="text-left rounded-xl border p-4 hover:bg-accent" onClick={() => setActiveGoalId(g.id)}>
->>>>>>> a0ca62188e3511beda6ae985328d2ea36a93fd8e
               <div className="font-medium mb-1">{g.title}</div>
               <div className="text-xs text-muted-foreground mb-2">{g.completedTaskCount} of {g.taskCount} tasks</div>
               <div className="w-full h-2 bg-muted rounded-full overflow-hidden">
@@ -313,7 +275,6 @@ export default function GoalsView({ partnershipId, matchType, menteeId, currentU
       {/* Goal detail */}
       {activeGoal && (
         <div className="mt-8 rounded-xl border p-4">
-<<<<<<< HEAD
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-4">
             <div>
               <div className="text-lg font-semibold">{activeGoal.title}</div>
@@ -440,28 +401,6 @@ export default function GoalsView({ partnershipId, matchType, menteeId, currentU
                 </div>
               )
             })}
-=======
-          <div className="flex items-center justify-between mb-4">
-            <div>
-              <div className="text-lg font-semibold">{activeGoal.title}</div>
-              {activeGoal.description && <div className="text-sm text-muted-foreground">{activeGoal.description}</div>}
-            </div>
-            <Button variant="outline" onClick={() => setActiveGoalId(null)}>Close</Button>
-          </div>
-
-          <div className="space-y-2 mb-4">
-            {tasks.map((t) => (
-              <label key={t.id} className="flex items-center gap-3 rounded-lg border p-3">
-                <input
-                  type="checkbox"
-                  checked={t.isComplete}
-                  disabled={!canToggleTasks}
-                  onChange={(e) => toggleTask(partnershipId, activeGoal.id, t.id, e.target.checked)}
-                />
-                <span className={t.isComplete ? 'line-through text-muted-foreground' : ''}>{t.text}</span>
-              </label>
-            ))}
->>>>>>> a0ca62188e3511beda6ae985328d2ea36a93fd8e
             {tasks.length === 0 && <div className="text-sm text-muted-foreground">No tasks yet.</div>}
           </div>
 
@@ -477,7 +416,6 @@ export default function GoalsView({ partnershipId, matchType, menteeId, currentU
         <DialogContent>
           <DialogHeader>
             <DialogTitle>New Goal</DialogTitle>
-<<<<<<< HEAD
             <DialogDescription>Define the objective for this partnership. AI can automatically break it down into tasks.</DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
@@ -618,13 +556,6 @@ export default function GoalsView({ partnershipId, matchType, menteeId, currentU
                 Save task
               </Button>
             </div>
-=======
-            <DialogDescription>Define the objective for this partnership.</DialogDescription>
-          </DialogHeader>
-          <div className="flex gap-2">
-            <Input placeholder="Goal title" value={newGoalTitle} onChange={(e) => setNewGoalTitle(e.target.value)} />
-            <Button onClick={handleCreateGoal} disabled={!newGoalTitle.trim()}>Create</Button>
->>>>>>> a0ca62188e3511beda6ae985328d2ea36a93fd8e
           </div>
         </DialogContent>
       </Dialog>
