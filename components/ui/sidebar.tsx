@@ -193,7 +193,7 @@ export function Sidebar() {
 
   return (
     <aside
-      className={`flex flex-col justify-between h-screen bg-card shadow-xl px-2 py-6 transition-all duration-300 border-r border-border ${
+      className={`flex flex-col justify-between h-screen bg-card shadow-xl px-2 py-6 fixed left-0 top-0 z-40 transition-all duration-300 border-r border-border ${
         effectiveCollapsed ? "w-20" : "w-64"
       }`}
     >
