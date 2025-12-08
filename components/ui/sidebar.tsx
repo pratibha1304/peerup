@@ -27,6 +27,21 @@ export function Sidebar() {
   const [collapsed, setCollapsed] = useState(false);
   const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [isMobile, setIsMobile] = useState(false);
+
+  // Detect mobile and prevent collapse on mobile
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 768);
+      if (window.innerWidth < 768) {
+        setCollapsed(false); // Always expanded on mobile
+      }
+    };
+    
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
 
   useEffect(() => {
     const fetchUser = async () => {
@@ -173,10 +188,13 @@ export function Sidebar() {
     );
   }
 
+  // On mobile, always show full width (no collapse)
+  const effectiveCollapsed = isMobile ? false : collapsed;
+
   return (
     <aside
       className={`flex flex-col justify-between h-screen bg-card shadow-xl px-2 py-6 transition-all duration-300 border-r border-border ${
-        collapsed ? "w-20" : "w-64"
+        effectiveCollapsed ? "w-20" : "w-64"
       }`}
     >
       <div>
@@ -184,7 +202,7 @@ export function Sidebar() {
           <div className="w-8 h-8 bg-gradient-to-br from-primary to-accent rounded-xl flex items-center justify-center">
             <Heart className="w-4 h-4 text-white" />
           </div>
-          {!collapsed && (
+          {!effectiveCollapsed && (
             <span className="text-2xl font-heading font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
               PeerUp
             </span>
@@ -201,15 +219,15 @@ export function Sidebar() {
                 }`}
               >
                 <link.icon className="w-5 h-5" />
-                {!collapsed && <span>{link.label}</span>}
+                {!effectiveCollapsed && <span>{link.label}</span>}
               </a>
             </Link>
           ))}
         </nav>
       </div>
       <div className="flex flex-col items-center gap-3 mt-8 mb-2">
-        {/* Collapse Toggle */}
-        <div className="w-full px-2">
+        {/* Collapse Toggle - Hidden on mobile */}
+        <div className="w-full px-2 hidden md:block">
           <button
             className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-xl bg-primary/10 text-primary font-medium hover:bg-primary/20 transition-all duration-300 shadow-sm"
             onClick={() => setCollapsed((c) => !c)}
@@ -225,12 +243,12 @@ export function Sidebar() {
             alt="User avatar"
             className="w-10 h-10 rounded-full border-2 border-primary object-cover mb-1 shadow-lg"
           />
-          {!collapsed && (
+          {!effectiveCollapsed && (
             <div className="font-heading font-semibold text-foreground text-center">
               {user?.name || "User"}
             </div>
           )}
-          {!collapsed && (
+          {!effectiveCollapsed && (
             <div className="text-xs text-muted-foreground mb-2 capitalize">
               {user?.role || "User"}
             </div>
@@ -240,7 +258,7 @@ export function Sidebar() {
             onClick={handleLogout}
           >
             <LogOut className="w-4 h-4" /> 
-            {!collapsed && "Log out"}
+            {!effectiveCollapsed && "Log out"}
           </button>
         </div>
       </div>

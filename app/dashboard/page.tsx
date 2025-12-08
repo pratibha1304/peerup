@@ -44,13 +44,13 @@ export default function DashboardPage() {
 
   return (
     <div className="w-full">
-      <div className="mb-8">
-        <p className="text-sm uppercase tracking-wide text-muted-foreground">Welcome back</p>
-        <h1 className="text-4xl font-extrabold mb-1 text-[#645990] dark:text-[#85BCB1]">
+      <div className="mb-6 md:mb-8">
+        <p className="text-xs md:text-sm uppercase tracking-wide text-muted-foreground">Welcome back</p>
+        <h1 className="text-2xl md:text-4xl font-extrabold mb-1 text-[#645990] dark:text-[#85BCB1]">
           Hey {user.name || "there"}
         </h1>
-        <p className="text-lg text-muted-foreground">
-          Here’s what needs your attention right now.
+        <p className="text-sm md:text-lg text-muted-foreground">
+          Here's what needs your attention right now.
         </p>
       </div>
 
@@ -82,36 +82,36 @@ export default function DashboardPage() {
         </div>
       )}
 
-      <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-4 mb-8">
+      <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3 md:gap-4 mb-6 md:mb-8">
         {stats.cards.map((card) => {
           const Icon = iconMap[card.id] || Activity;
           return (
             <div
               key={card.id}
-              className="rounded-2xl border bg-white/70 dark:bg-[#23272f] p-4 shadow-sm"
+              className="rounded-xl md:rounded-2xl border bg-white/70 dark:bg-[#23272f] p-3 md:p-4 shadow-sm"
             >
-              <div className="flex items-start justify-between mb-6">
-                <div>
-                  <p className="text-xs uppercase tracking-wide text-muted-foreground">
+              <div className="flex items-start justify-between mb-3 md:mb-6">
+                <div className="flex-1 min-w-0">
+                  <p className="text-[10px] md:text-xs uppercase tracking-wide text-muted-foreground truncate">
                     {card.label}
                   </p>
-                  <div className="text-3xl font-bold mt-2">{card.value}</div>
+                  <div className="text-xl md:text-3xl font-bold mt-1 md:mt-2">{card.value}</div>
                 </div>
-                <div className="rounded-full bg-primary/10 p-2 text-primary">
-                  <Icon className="h-5 w-5" />
+                <div className="rounded-full bg-primary/10 p-1.5 md:p-2 text-primary flex-shrink-0 ml-2">
+                  <Icon className="h-4 w-4 md:h-5 md:w-5" />
                 </div>
               </div>
               {card.helper && (
-                <p className="text-xs text-muted-foreground">{card.helper}</p>
+                <p className="text-[10px] md:text-xs text-muted-foreground line-clamp-2">{card.helper}</p>
               )}
             </div>
           );
         })}
       </div>
 
-      <div className="grid lg:grid-cols-3 gap-6 mb-8">
-        <div className="lg:col-span-2 space-y-6">
-          <div className="rounded-2xl border bg-white dark:bg-[#23272f] p-6 shadow-sm">
+      <div className="grid lg:grid-cols-3 gap-4 md:gap-6 mb-6 md:mb-8">
+        <div className="lg:col-span-2 space-y-4 md:space-y-6">
+          <div className="rounded-xl md:rounded-2xl border bg-white dark:bg-[#23272f] p-4 md:p-6 shadow-sm">
             <div className="flex items-center justify-between mb-4">
               <div>
                 <p className="text-sm uppercase tracking-wide text-muted-foreground">
@@ -135,9 +135,9 @@ export default function DashboardPage() {
             </p>
           </div>
 
-          <div className="rounded-2xl border bg-white dark:bg-[#23272f] p-6 shadow-sm">
+          <div className="rounded-xl md:rounded-2xl border bg-white dark:bg-[#23272f] p-4 md:p-6 shadow-sm">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold">Focus goals</h3>
+              <h3 className="text-base md:text-lg font-semibold">Focus goals</h3>
               <Link
                 href="/dashboard/match"
                 className="text-sm font-medium text-primary hover:underline"
@@ -174,9 +174,9 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        <div className="space-y-6">
-          <div className="rounded-2xl border bg-white dark:bg-[#23272f] p-6 shadow-sm">
-            <h3 className="text-lg font-semibold mb-4">Upcoming sessions</h3>
+        <div className="space-y-4 md:space-y-6">
+          <div className="rounded-xl md:rounded-2xl border bg-white dark:bg-[#23272f] p-4 md:p-6 shadow-sm">
+            <h3 className="text-base md:text-lg font-semibold mb-3 md:mb-4">Upcoming sessions</h3>
             {stats.upcomingSessions.length === 0 ? (
               <p className="text-sm text-muted-foreground">No confirmed sessions yet.</p>
             ) : (
@@ -195,8 +195,8 @@ export default function DashboardPage() {
             )}
           </div>
 
-          <div className="rounded-2xl border bg-white dark:bg-[#23272f] p-6 shadow-sm">
-            <h3 className="text-lg font-semibold mb-2">Match requests</h3>
+          <div className="rounded-xl md:rounded-2xl border bg-white dark:bg-[#23272f] p-4 md:p-6 shadow-sm">
+            <h3 className="text-base md:text-lg font-semibold mb-2">Match requests</h3>
             <p className="text-sm text-muted-foreground mb-4">
               {stats.requests.incoming} incoming • {stats.requests.outgoing} outgoing
             </p>
@@ -210,9 +210,9 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      <div className="rounded-2xl border bg-white dark:bg-[#23272f] p-6 shadow-sm">
-        <div className="text-lg font-semibold mb-4">Your Profile</div>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+      <div className="rounded-xl md:rounded-2xl border bg-white dark:bg-[#23272f] p-4 md:p-6 shadow-sm">
+        <div className="text-base md:text-lg font-semibold mb-3 md:mb-4">Your Profile</div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4 text-xs md:text-sm">
           <div>
             <span className="font-medium">Name:</span> {user.name}
           </div>

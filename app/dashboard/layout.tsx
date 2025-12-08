@@ -31,7 +31,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         <Sidebar />
       </aside>
 
-      <main className="flex-1 ml-0 md:ml-64 p-4 md:p-6 overflow-y-auto w-full min-w-0 max-w-full">
+      <main className="flex-1 ml-0 md:ml-64 p-6 overflow-y-auto w-full min-w-0">
         <div className="flex items-center justify-between mb-6">
           <Button
             variant="ghost"
