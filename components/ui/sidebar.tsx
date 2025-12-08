@@ -80,12 +80,6 @@ export function Sidebar() {
         tooltip: "👤 Edit your profile and switch roles.",
       },
       {
-        href: "/dashboard/test",
-        label: "Test",
-        icon: User,
-        tooltip: "🧪 Test backend connectivity.",
-      },
-      {
         href: "/dashboard/settings",
         label: "Settings",
         icon: Settings,

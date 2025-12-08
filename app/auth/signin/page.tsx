@@ -19,12 +19,28 @@ export default function SigninPage() {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(false);
 
+  // Email validation function
+  const isValidEmail = (email: string): boolean => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(email);
+  };
+
   const handleSignin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError("");
     setSuccess(false);
+    
     try {
+      // Validate email format
+      if (!email || !isValidEmail(email)) {
+        throw new Error("Please enter a valid email address");
+      }
+      
+      if (!password) {
+        throw new Error("Please enter your password");
+      }
+      
       await signIn(email, password);
       setSuccess(true);
       setTimeout(() => {

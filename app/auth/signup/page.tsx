@@ -67,6 +67,12 @@ const [resumeUrl, setResumeUrl] = useState("");
     }
   };
 
+  // Email validation function
+  const isValidEmail = (email: string): boolean => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(email);
+  };
+
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -78,6 +84,17 @@ const [resumeUrl, setResumeUrl] = useState("");
       if (!name || !email || !password) {
         throw new Error("Please fill in all required fields");
       }
+      
+      // Validate email format
+      if (!isValidEmail(email)) {
+        throw new Error("Please enter a valid email address");
+      }
+      
+      // Validate password length
+      if (password.length < 6) {
+        throw new Error("Password must be at least 6 characters long");
+      }
+      
       if (role === "mentor" && !resumeUrl.trim()) {
         throw new Error("Mentors must include a portfolio or resume link");
       }
