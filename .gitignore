@@ -24,7 +24,13 @@ yarn-error.log*
 
 # typescript
 *.tsbuildinfo
-next-env.d.ts"peerup-64fbf-firebase-adminsdk-fbsvc-688bc91130.json" 
+next-env.d.ts
+
+# Firebase service account keys (SECURITY - never commit these!)
+*-firebase-adminsdk-*.json
+*firebase-adminsdk*.json
+service-account*.json
+
 # Folders
 node_modules/
 dist/
@@ -32,6 +38,8 @@ build/
 
 # Firebase / Environment files with secret keys
 .env
+.env.local
+.env.production
 firebase.config.js
 google-services.json
 
