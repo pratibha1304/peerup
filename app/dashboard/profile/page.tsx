@@ -97,6 +97,12 @@ export default function ProfilePage() {
       return;
     }
     
+    // Prevent multiple simultaneous saves
+    if (saving) {
+      console.warn("Save already in progress, ignoring duplicate request");
+      return;
+    }
+    
     setSaving(true);
     setError("");
     setSuccess(false);
@@ -119,7 +125,6 @@ export default function ProfilePage() {
           }
         } catch (uploadError: any) {
           console.error("Upload error:", uploadError);
-          setSaving(false);
           throw new Error(`Failed to upload image: ${uploadError.message}`);
         }
       } else if (profilePicUrl && !profilePicUrl.startsWith("blob:") && profilePicUrl.startsWith("http")) {
@@ -128,25 +133,47 @@ export default function ProfilePage() {
       }
       // Otherwise, keep the existing user.profilePicUrl (already set above)
 
+      // Build updates object, ensuring no undefined values
       const updates: any = {
         name: name.trim(),
         role: role as 'mentor' | 'buddy' | 'mentee',
-        profilePicUrl: uploadedUrl,
       };
+
+      // Always include profilePicUrl (even if empty string)
+      if (uploadedUrl) {
+        updates.profilePicUrl = uploadedUrl;
+      }
 
       // Add optional fields only if they have values
       if (age.trim()) updates.age = age.trim();
       if (location.trim()) updates.location = location.trim();
       if (linkedin.trim()) updates.linkedin = linkedin.trim();
-      if (skills.length > 0) updates.skills = skills;
-      if (interests.length > 0) updates.interests = interests;
+      if (skills && skills.length > 0) updates.skills = skills;
+      if (interests && interests.length > 0) updates.interests = interests;
       if (goals.trim()) updates.goals = goals.trim();
-      if (availability.length > 0) updates.availability = availability;
-      if (interaction) updates.interaction = interaction;
+      if (availability && availability.length > 0) updates.availability = availability;
+      if (interaction && interaction.trim()) updates.interaction = interaction.trim();
       if (resumeUrl.trim()) updates.resumeUrl = resumeUrl.trim();
 
+      // Remove any undefined values (Firestore doesn't accept them)
+      Object.keys(updates).forEach(key => {
+        if (updates[key] === undefined) {
+          delete updates[key];
+        }
+      });
+
       console.log("Updating profile with:", updates);
-      await updateProfile(updates);
+      
+      // Add timeout to prevent infinite loading
+      const timeoutPromise = new Promise((_, reject) => {
+        setTimeout(() => reject(new Error("Profile update timed out after 30 seconds")), 30000);
+      });
+      
+      await Promise.race([
+        updateProfile(updates),
+        timeoutPromise
+      ]);
+      
       console.log("Profile updated successfully");
       
       setProfile((prev: any) => ({ ...(prev || {}), ...updates }));
@@ -157,8 +184,14 @@ export default function ProfilePage() {
       setTimeout(() => setSuccess(false), 3000);
     } catch (err: any) {
       console.error("Profile update error:", err);
-      setError(err.message || "Failed to save profile. Please try again.");
+      const errorMessage = err.message || "Failed to save profile. Please try again.";
+      setError(errorMessage);
+      // Ensure we show the error to the user
+      if (errorMessage.includes("permission") || errorMessage.includes("Permission")) {
+        setError("Permission denied. Please check your authentication and try again.");
+      }
     } finally {
+      // Always reset saving state, even if there was an error
       setSaving(false);
     }
   };

@@ -146,12 +146,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!user) {
       throw new Error('User must be authenticated to update profile');
     }
+    if (!user.uid) {
+      throw new Error('User UID is missing');
+    }
     try {
-      await updateDoc(doc(db, 'users', user.uid), updates);
+      console.log('Updating Firestore document:', user.uid, updates);
+      const userRef = doc(db, 'users', user.uid);
+      await updateDoc(userRef, updates);
+      console.log('Firestore update successful');
       setUser({ ...user, ...updates });
+      console.log('User state updated');
     } catch (error: any) {
       console.error('Profile update error:', error);
-      throw new Error(error.message || 'Failed to update profile');
+      console.error('Error code:', error.code);
+      console.error('Error message:', error.message);
+      // Provide more specific error messages
+      if (error.code === 'permission-denied') {
+        throw new Error('Permission denied. You may not have permission to update this profile.');
+      } else if (error.code === 'unavailable') {
+        throw new Error('Service temporarily unavailable. Please try again later.');
+      } else {
+        throw new Error(error.message || 'Failed to update profile');
+      }
     }
   };
 
