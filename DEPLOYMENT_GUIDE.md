@@ -178,6 +178,28 @@ npm run build
 - Verify Firebase project ID matches in environment variables
 - Check Firebase project is active
 - Ensure Firestore rules are deployed
+- Ensure Firebase Storage rules are deployed (see Issue 7 below)
+
+### Issue 7: Firebase Storage CORS Error / Profile Picture Upload Fails
+**Error:** "Access to XMLHttpRequest blocked by CORS policy" or "Failed to upload image"
+**Solution:**
+1. **Deploy Firebase Storage Rules:**
+   ```bash
+   # Install Firebase CLI if not already installed
+   npm install -g firebase-tools
+   
+   # Login to Firebase
+   firebase login
+   
+   # Deploy storage rules
+   firebase deploy --only storage
+   ```
+2. **Verify rules are deployed:**
+   - Go to Firebase Console → Storage → Rules
+   - Ensure rules allow authenticated users to upload to their own folder
+3. **Check authorized domains:**
+   - Go to Firebase Console → Authentication → Settings → Authorized domains
+   - Ensure your Netlify domain (`peerup152.netlify.app`) is added
 
 ### Issue 4: API Routes Not Working
 **Solution:**
@@ -212,6 +234,7 @@ npm run build
 - [ ] Firebase project configured
 - [ ] Firestore rules deployed
 - [ ] Firestore indexes created
+- [ ] Firebase Storage rules deployed
 - [ ] API keys secured (not in code)
 - [ ] Test authentication flow
 - [ ] Test matching functionality
