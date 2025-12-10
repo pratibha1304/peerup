@@ -96,21 +96,30 @@ export default function ProfilePage() {
       setError("Mentors must include a portfolio or resume link.");
       return;
     }
+    
     setSaving(true);
     setError("");
     setSuccess(false);
+    
     try {
       let uploadedUrl = user.profilePicUrl || "";
       
       // Upload new profile picture if one was selected
       if (profilePic) {
+        console.log("Uploading profile picture...");
         try {
           const fileRef = ref(storage, `profile-pictures/${user.uid}/${Date.now()}-${profilePic.name}`);
           await uploadBytes(fileRef, profilePic);
           uploadedUrl = await getDownloadURL(fileRef);
+          console.log("Profile picture uploaded successfully:", uploadedUrl);
           setProfilePic(null);
+          // Revoke the blob URL if it exists
+          if (profilePicUrl && profilePicUrl.startsWith("blob:")) {
+            URL.revokeObjectURL(profilePicUrl);
+          }
         } catch (uploadError: any) {
           console.error("Upload error:", uploadError);
+          setSaving(false);
           throw new Error(`Failed to upload image: ${uploadError.message}`);
         }
       } else if (profilePicUrl && !profilePicUrl.startsWith("blob:") && profilePicUrl.startsWith("http")) {
@@ -136,7 +145,10 @@ export default function ProfilePage() {
       if (interaction) updates.interaction = interaction;
       if (resumeUrl.trim()) updates.resumeUrl = resumeUrl.trim();
 
+      console.log("Updating profile with:", updates);
       await updateProfile(updates);
+      console.log("Profile updated successfully");
+      
       setProfile((prev: any) => ({ ...(prev || {}), ...updates }));
       if (uploadedUrl) {
         setProfilePicUrl(uploadedUrl);

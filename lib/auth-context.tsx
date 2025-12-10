@@ -143,13 +143,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const updateProfile = async (updates: Partial<User>) => {
-    if (user) {
-      try {
-        await updateDoc(doc(db, 'users', user.uid), updates);
-        setUser({ ...user, ...updates });
-      } catch (error: any) {
-        throw new Error(error.message || 'Failed to update profile');
-      }
+    if (!user) {
+      throw new Error('User must be authenticated to update profile');
+    }
+    try {
+      await updateDoc(doc(db, 'users', user.uid), updates);
+      setUser({ ...user, ...updates });
+    } catch (error: any) {
+      console.error('Profile update error:', error);
+      throw new Error(error.message || 'Failed to update profile');
     }
   };
 

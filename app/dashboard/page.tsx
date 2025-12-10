@@ -91,13 +91,13 @@ export default function DashboardPage() {
               className="rounded-xl md:rounded-2xl border bg-white/70 dark:bg-[#23272f] p-3 md:p-4 shadow-sm"
             >
               <div className="flex items-start justify-between mb-3 md:mb-6">
-                <div className="flex-1 min-w-0 md:flex-none">
+                <div className="flex-1 min-w-0">
                   <p className="text-[10px] md:text-xs uppercase tracking-wide text-muted-foreground md:truncate">
                     {card.label}
                   </p>
                   <div className="text-xl md:text-3xl font-bold mt-1 md:mt-2">{card.value}</div>
                 </div>
-                <div className="rounded-full bg-primary/10 p-1.5 md:p-2 text-primary flex-shrink-0 ml-2">
+                <div className="rounded-full bg-primary/10 p-1.5 md:p-2 text-primary flex-shrink-0 ml-2 flex items-center justify-center">
                   <Icon className="h-4 w-4 md:h-5 md:w-5" />
                 </div>
               </div>
