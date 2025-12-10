@@ -1,25 +1,11 @@
 "use client";
 import { useEffect, useState, useRef } from "react";
-import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage";
+import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { User, Camera, Save, RefreshCw, AlertCircle, CheckCircle } from "lucide-react";
-import { initializeApp, getApps } from "firebase/app";
 import { MultiCombobox } from "@/components/ui/multi-combobox";
 import { PROFILE_TAGS } from "@/lib/profile-options";
 import { useAuth } from "@/lib/auth-context";
-
-// Add your Firebase config here or use environment variables
-const firebaseConfig = {
-  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY || "YOUR_API_KEY",
-  authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN || "YOUR_AUTH_DOMAIN",
-  projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || "YOUR_PROJECT_ID",
-  storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET || "YOUR_STORAGE_BUCKET",
-  messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID || "YOUR_MESSAGING_SENDER_ID",
-  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID || "YOUR_APP_ID"
-};
-
-if (!getApps().length) {
-  initializeApp(firebaseConfig);
-}
+import { storage } from "@/lib/firebase";
 
 const ROLES = [
   { value: "mentor", label: "Mentor", desc: "Guide others, share your expertise" },
@@ -38,7 +24,6 @@ export default function ProfilePage() {
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const storage = getStorage();
 
   // Form fields
   const [name, setName] = useState("");
@@ -54,7 +39,7 @@ export default function ProfilePage() {
   const [profilePic, setProfilePic] = useState<File | null>(null);
   const [profilePicUrl, setProfilePicUrl] = useState("");
   const [resumeUrl, setResumeUrl] = useState("");
-  const { user, loading: authLoading, updateProfile: updateUserProfile } = useAuth();
+  const { user, loading: authLoading, updateProfile } = useAuth();
 
   useEffect(() => {
     if (authLoading) return;
@@ -115,36 +100,52 @@ export default function ProfilePage() {
     setError("");
     setSuccess(false);
     try {
-      let uploadedUrl = profilePicUrl;
+      let uploadedUrl = user.profilePicUrl || "";
+      
+      // Upload new profile picture if one was selected
       if (profilePic) {
-        const fileRef = ref(storage, `profile-pictures/${user.uid}/${Date.now()}-${profilePic.name}`);
-        await uploadBytes(fileRef, profilePic);
-        uploadedUrl = await getDownloadURL(fileRef);
-        setProfilePic(null);
+        try {
+          const fileRef = ref(storage, `profile-pictures/${user.uid}/${Date.now()}-${profilePic.name}`);
+          await uploadBytes(fileRef, profilePic);
+          uploadedUrl = await getDownloadURL(fileRef);
+          setProfilePic(null);
+        } catch (uploadError: any) {
+          console.error("Upload error:", uploadError);
+          throw new Error(`Failed to upload image: ${uploadError.message}`);
+        }
+      } else if (profilePicUrl && !profilePicUrl.startsWith("blob:") && profilePicUrl.startsWith("http")) {
+        // If it's a valid HTTP URL (not a blob preview), use it
+        uploadedUrl = profilePicUrl;
       }
+      // Otherwise, keep the existing user.profilePicUrl (already set above)
 
-      const updates = {
+      const updates: any = {
         name: name.trim(),
-        role,
-        age: age.trim(),
-        location: location.trim(),
-        linkedin: linkedin.trim(),
-        skills,
-        interests,
-        goals: goals.trim(),
-        availability,
-        interaction,
+        role: role as 'mentor' | 'buddy' | 'mentee',
         profilePicUrl: uploadedUrl,
-        resumeUrl: resumeUrl.trim(),
       };
 
-      await updateUserProfile(updates);
+      // Add optional fields only if they have values
+      if (age.trim()) updates.age = age.trim();
+      if (location.trim()) updates.location = location.trim();
+      if (linkedin.trim()) updates.linkedin = linkedin.trim();
+      if (skills.length > 0) updates.skills = skills;
+      if (interests.length > 0) updates.interests = interests;
+      if (goals.trim()) updates.goals = goals.trim();
+      if (availability.length > 0) updates.availability = availability;
+      if (interaction) updates.interaction = interaction;
+      if (resumeUrl.trim()) updates.resumeUrl = resumeUrl.trim();
+
+      await updateProfile(updates);
       setProfile((prev: any) => ({ ...(prev || {}), ...updates }));
-      setProfilePicUrl(uploadedUrl);
+      if (uploadedUrl) {
+        setProfilePicUrl(uploadedUrl);
+      }
       setSuccess(true);
       setTimeout(() => setSuccess(false), 3000);
     } catch (err: any) {
-      setError(err.message || "Failed to save profile");
+      console.error("Profile update error:", err);
+      setError(err.message || "Failed to save profile. Please try again.");
     } finally {
       setSaving(false);
     }

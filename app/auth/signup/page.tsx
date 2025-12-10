@@ -2,7 +2,7 @@
 import React, { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
-import { ArrowLeft, Sparkles, User, Target, FileText, CheckCircle } from "lucide-react";
+import { ArrowLeft, Sparkles, User, Target, FileText, CheckCircle, Eye, EyeOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -38,6 +38,7 @@ function SignupForm() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
   // Form data
   const [name, setName] = useState("");
@@ -55,6 +56,53 @@ const [resumeUrl, setResumeUrl] = useState("");
   const [interaction, setInteraction] = useState("");
 
   const totalSteps = role === "mentor" ? 6 : 5;
+
+  // Load form data from localStorage on mount
+  useEffect(() => {
+    const savedData = localStorage.getItem("signup_form_data");
+    if (savedData) {
+      try {
+        const parsed = JSON.parse(savedData);
+        if (parsed.name) setName(parsed.name);
+        if (parsed.email) setEmail(parsed.email);
+        if (parsed.password) setPassword(parsed.password);
+        if (parsed.role) setRole(parsed.role);
+        if (parsed.age) setAge(parsed.age);
+        if (parsed.location) setLocation(parsed.location);
+        if (parsed.linkedin) setLinkedin(parsed.linkedin);
+        if (parsed.resumeUrl) setResumeUrl(parsed.resumeUrl);
+        if (parsed.skills) setSkills(parsed.skills);
+        if (parsed.interests) setInterests(parsed.interests);
+        if (parsed.goals) setGoals(parsed.goals);
+        if (parsed.availability) setAvailability(parsed.availability);
+        if (parsed.interaction) setInteraction(parsed.interaction);
+        if (parsed.step) setStep(parsed.step);
+      } catch (e) {
+        console.error("Error loading saved form data:", e);
+      }
+    }
+  }, []);
+
+  // Save form data to localStorage whenever it changes
+  useEffect(() => {
+    const formData = {
+      name,
+      email,
+      password,
+      role,
+      age,
+      location,
+      linkedin,
+      resumeUrl,
+      skills,
+      interests,
+      goals,
+      availability,
+      interaction,
+      step,
+    };
+    localStorage.setItem("signup_form_data", JSON.stringify(formData));
+  }, [name, email, password, role, age, location, linkedin, resumeUrl, skills, interests, goals, availability, interaction, step]);
 
   const handleNext = () => setStep((s) => s + 1);
   const handleBack = () => setStep((s) => s - 1);
@@ -118,6 +166,8 @@ const [resumeUrl, setResumeUrl] = useState("");
       };
       
       await signUp(userData);
+      // Clear saved form data on successful signup
+      localStorage.removeItem("signup_form_data");
       setSuccess(true);
       setTimeout(() => {
         router.push("/dashboard");
@@ -169,16 +219,30 @@ const [resumeUrl, setResumeUrl] = useState("");
               </div>
               <div className="space-y-2">
                 <Label htmlFor="password" className="text-foreground font-medium">Password</Label>
-                <Input
-                  id="password"
-                  type="password"
-                  value={password}
-                  onChange={e => setPassword(e.target.value)}
-                  required
-                  minLength={6}
-                  className="h-12 rounded-xl border-primary/20 focus:border-primary transition-colors"
-                  placeholder="Create a strong password"
-                />
+                <div className="relative">
+                  <Input
+                    id="password"
+                    type={showPassword ? "text" : "password"}
+                    value={password}
+                    onChange={e => setPassword(e.target.value)}
+                    required
+                    minLength={6}
+                    className="h-12 rounded-xl border-primary/20 focus:border-primary transition-colors pr-10"
+                    placeholder="Create a strong password"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                    aria-label={showPassword ? "Hide password" : "Show password"}
+                  >
+                    {showPassword ? (
+                      <EyeOff className="w-5 h-5" />
+                    ) : (
+                      <Eye className="w-5 h-5" />
+                    )}
+                  </button>
+                </div>
               </div>
             </div>
           </div>

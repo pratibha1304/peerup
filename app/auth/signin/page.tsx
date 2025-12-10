@@ -1,5 +1,5 @@
 "use client";
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 import { Button } from "@/components/ui/button";
@@ -7,7 +7,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
-import { ArrowLeft, Mail, Lock, Sparkles } from "lucide-react";
+import { ArrowLeft, Mail, Lock, Sparkles, Eye, EyeOff } from "lucide-react";
 import Link from "next/link";
 
 export default function SigninPage() {
@@ -15,9 +15,31 @@ export default function SigninPage() {
   const { signIn } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(false);
+
+  // Load form data from localStorage on mount
+  useEffect(() => {
+    const savedEmail = localStorage.getItem("signin_email");
+    const savedPassword = localStorage.getItem("signin_password");
+    if (savedEmail) setEmail(savedEmail);
+    if (savedPassword) setPassword(savedPassword);
+  }, []);
+
+  // Save form data to localStorage whenever it changes
+  useEffect(() => {
+    if (email) {
+      localStorage.setItem("signin_email", email);
+    }
+  }, [email]);
+
+  useEffect(() => {
+    if (password) {
+      localStorage.setItem("signin_password", password);
+    }
+  }, [password]);
 
   // Email validation function
   const isValidEmail = (email: string): boolean => {
@@ -42,6 +64,9 @@ export default function SigninPage() {
       }
       
       await signIn(email, password);
+      // Clear saved form data on successful signin
+      localStorage.removeItem("signin_email");
+      localStorage.removeItem("signin_password");
       setSuccess(true);
       setTimeout(() => {
         router.push("/dashboard");
@@ -115,13 +140,25 @@ export default function SigninPage() {
                   <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-muted-foreground" />
                   <Input
                     id="password"
-                    type="password"
+                    type={showPassword ? "text" : "password"}
                     placeholder="Enter your password"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    className="pl-10"
+                    className="pl-10 pr-10"
                     required
                   />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                    aria-label={showPassword ? "Hide password" : "Show password"}
+                  >
+                    {showPassword ? (
+                      <EyeOff className="w-5 h-5" />
+                    ) : (
+                      <Eye className="w-5 h-5" />
+                    )}
+                  </button>
                 </div>
               </div>
 
