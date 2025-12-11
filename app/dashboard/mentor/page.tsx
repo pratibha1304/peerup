@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { auth, db } from "@/lib/firebase";
 import { doc, getDoc, collection, getDocs } from "firebase/firestore";
-import { GraduationCap, Filter, Search, Star, MapPin, Calendar, MessageCircle, RefreshCw, Award, Clock, User, Send, Inbox } from "lucide-react";
+import { GraduationCap, Filter, Search, Star, MapPin, Calendar, MessageCircle, RefreshCw, Award, Clock, User, Send, Inbox, FileText, ExternalLink } from "lucide-react";
 import { sendMatchRequest, listenIncomingRequests, listenOutgoingRequests, MatchRequest } from '@/lib/matchRequests';
 import { PROFILE_TAGS } from "@/lib/profile-options";
 
@@ -409,6 +409,22 @@ export default function MentorPage() {
                       </span>
                     )}
                   </div>
+                </div>
+              )}
+
+              {/* Resume/Portfolio Link - Only show for mentors */}
+              {profile?.role === 'mentee' && match.user.role === 'mentor' && match.user.resumeUrl && (
+                <div className="mb-4">
+                  <a
+                    href={match.user.resumeUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-2 px-4 py-2 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 text-blue-700 dark:text-blue-400 rounded-lg hover:bg-blue-100 dark:hover:bg-blue-900/30 transition-colors text-sm font-medium"
+                  >
+                    <FileText className="w-4 h-4" />
+                    <span>View Resume/Portfolio</span>
+                    <ExternalLink className="w-3 h-3" />
+                  </a>
                 </div>
               )}
 
