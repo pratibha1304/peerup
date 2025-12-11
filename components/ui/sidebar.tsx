@@ -19,14 +19,12 @@ import {
   UserCheck,
 } from "lucide-react";
 import { useState, useEffect } from "react";
-import { auth, db } from "@/lib/firebase";
-import { doc, getDoc, updateDoc } from "firebase/firestore";
+import { useAuth } from "@/lib/auth-context";
 
 export function Sidebar() {
   const pathname = usePathname();
   const [collapsed, setCollapsed] = useState(false);
-  const [user, setUser] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
+  const { user, loading } = useAuth(); // Use auth context instead of fetching separately
   const [isMobile, setIsMobile] = useState(false);
 
   // Detect mobile and prevent collapse on mobile
@@ -41,25 +39,6 @@ export function Sidebar() {
     checkMobile();
     window.addEventListener('resize', checkMobile);
     return () => window.removeEventListener('resize', checkMobile);
-  }, []);
-
-  useEffect(() => {
-    const fetchUser = async () => {
-      try {
-        const currentUser = auth.currentUser;
-        if (currentUser) {
-          const userDoc = await getDoc(doc(db, "users", currentUser.uid));
-          if (userDoc.exists()) {
-            setUser(userDoc.data());
-          }
-        }
-      } catch (error) {
-        console.error("Error fetching user:", error);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchUser();
   }, []);
 
   const getRoleBasedNavLinks = () => {
@@ -169,7 +148,7 @@ export function Sidebar() {
 
   const handleLogout = async () => {
     try {
-      await auth.signOut();
+      await signOutUser();
       window.location.href = "/";
     } catch (error) {
       console.error("Error logging out:", error);
