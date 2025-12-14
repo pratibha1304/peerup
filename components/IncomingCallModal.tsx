@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
 import {
@@ -9,7 +9,7 @@ import {
   getPartnershipId,
   type CallRoom,
 } from '@/lib/calling';
-import { doc, getDoc, collection, query, where, getDocs, updateDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, getDoc, collection, query, where, getDocs, updateDoc, serverTimestamp, onSnapshot } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 
 interface IncomingCallData {
@@ -28,6 +28,12 @@ export function IncomingCallModal() {
   const [incomingCall, setIncomingCall] = useState<IncomingCallData | null>(null);
   const [callerProfile, setCallerProfile] = useState<CallerProfile | null>(null);
   const [isResponding, setIsResponding] = useState(false);
+  const incomingCallRef = useRef<IncomingCallData | null>(null);
+  
+  // Keep ref in sync with state
+  useEffect(() => {
+    incomingCallRef.current = incomingCall;
+  }, [incomingCall]);
 
   useEffect(() => {
     if (!user) return;
@@ -60,43 +66,75 @@ export function IncomingCallModal() {
 
     // Check for old calls when user logs in
     checkOldCalls();
-
+    
     // Listen for new incoming calls
     const unsubscribe = listenForIncomingCalls(user.uid, async (callData) => {
-      // Only show calls that are truly new (not old missed calls)
+      // Check call room status first
       const callRoomRef = doc(db, 'callRooms', callData.partnershipId);
       const callRoomSnap = await getDoc(callRoomRef);
       
-      if (callRoomSnap.exists()) {
-        const roomData = callRoomSnap.data();
-        const createdAt = roomData.createdAt?.toMillis?.() || 0;
-        const now = Date.now();
-        
-        // If call is older than 30 seconds, don't show it as incoming
-        if (createdAt > 0 && (now - createdAt) > 30000) {
-          // Mark as missed instead
-          await declineCall(callData.partnershipId);
-          return;
-        }
+      if (!callRoomSnap.exists()) {
+        return; // Call room doesn't exist
+      }
+      
+      const roomData = callRoomSnap.data();
+      
+      // Don't show if call is already ended or connected
+      if (roomData.status === 'ended' || roomData.status === 'connected') {
+        return;
+      }
+      
+      // Check if call is old (more than 30 seconds)
+      const createdAt = roomData.createdAt?.toMillis?.() || 0;
+      const now = Date.now();
+      
+      if (createdAt > 0 && (now - createdAt) > 30000) {
+        // Mark as missed instead of showing
+        await declineCall(callData.partnershipId);
+        return;
       }
 
-      setIncomingCall({
-        partnershipId: callData.partnershipId,
-        callerId: callData.callerId,
-      });
+      // Only show if status is still 'ringing'
+      if (roomData.status === 'ringing') {
+        setIncomingCall({
+          partnershipId: callData.partnershipId,
+          callerId: callData.callerId,
+        });
 
-      // Fetch caller's profile
-      try {
-        const callerDoc = await getDoc(doc(db, 'users', callData.callerId));
-        if (callerDoc.exists()) {
-          setCallerProfile(callerDoc.data() as CallerProfile);
+        // Fetch caller's profile
+        try {
+          const callerDoc = await getDoc(doc(db, 'users', callData.callerId));
+          if (callerDoc.exists()) {
+            setCallerProfile(callerDoc.data() as CallerProfile);
+          }
+        } catch (error) {
+          console.error('Error fetching caller profile:', error);
         }
-      } catch (error) {
-        console.error('Error fetching caller profile:', error);
       }
     });
-
-    return () => unsubscribe();
+    
+    // Listen to all call rooms for this user to detect when caller ends the call
+    const callRoomsRef = collection(db, 'callRooms');
+    const callRoomsQuery = query(
+      callRoomsRef,
+      where('calleeId', '==', user.uid)
+    );
+    
+    const callRoomsUnsub = onSnapshot(callRoomsQuery, (snapshot) => {
+      snapshot.docChanges().forEach((change) => {
+        const data = change.doc.data();
+        // If call status changed to 'ended' and we're showing it, hide the modal
+        if (data.status === 'ended' && incomingCallRef.current && change.doc.id === incomingCallRef.current.partnershipId) {
+          setIncomingCall(null);
+          setCallerProfile(null);
+        }
+      });
+    });
+    
+    return () => {
+      unsubscribe();
+      callRoomsUnsub();
+    };
   }, [user]);
 
   const handleAccept = async () => {

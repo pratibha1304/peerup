@@ -20,12 +20,14 @@ import {
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useAuth } from "@/lib/auth-context";
+import { useRouter } from "next/navigation";
 
 export function Sidebar() {
   const pathname = usePathname();
   const [collapsed, setCollapsed] = useState(false);
-  const { user, loading } = useAuth(); // Use auth context instead of fetching separately
+  const { user, loading, signOut } = useAuth(); // Use auth context instead of fetching separately
   const [isMobile, setIsMobile] = useState(false);
+  const router = useRouter();
 
   // Detect mobile and prevent collapse on mobile
   useEffect(() => {
@@ -148,10 +150,12 @@ export function Sidebar() {
 
   const handleLogout = async () => {
     try {
-      await signOutUser();
-      window.location.href = "/";
+      await signOut();
+      router.push("/");
     } catch (error) {
       console.error("Error logging out:", error);
+      // Still redirect even if there's an error
+      router.push("/");
     }
   };
 
@@ -216,7 +220,7 @@ export function Sidebar() {
             {!collapsed && <span className="text-sm font-medium">Collapse</span>}
           </button>
         </div>
-        <div className="flex flex-col items-center mt-4">
+        <div className="flex flex-col items-center mt-4 w-full px-2">
           <img
             src={user?.profilePicUrl || "/placeholder-user.jpg"}
             alt="User avatar"
@@ -233,11 +237,14 @@ export function Sidebar() {
             </div>
           )}
           <button 
-            className="flex items-center gap-2 px-3 py-2 rounded-xl bg-destructive/10 text-destructive font-medium hover:bg-destructive/20 transition-all duration-300 mt-2"
+            className={`flex items-center justify-center gap-2 px-3 py-2 rounded-xl bg-destructive/10 text-destructive font-medium hover:bg-destructive/20 transition-all duration-300 mt-2 w-full ${
+              effectiveCollapsed ? 'w-10 h-10' : ''
+            }`}
             onClick={handleLogout}
+            title="Log out"
           >
             <LogOut className="w-4 h-4" /> 
-            {!effectiveCollapsed && "Log out"}
+            {!effectiveCollapsed && <span>Log out</span>}
           </button>
         </div>
       </div>

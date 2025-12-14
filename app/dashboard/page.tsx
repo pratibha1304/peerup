@@ -83,28 +83,36 @@ export default function DashboardPage() {
       )}
 
       <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3 md:gap-4 mb-6 md:mb-8">
-        {stats.cards.map((card) => {
+              {stats.cards.map((card) => {
           const Icon = iconMap[card.id] || Activity;
+          const isMissedCalls = card.id === 'missedCalls';
           return (
-            <div
+            <Link
               key={card.id}
-              className="rounded-xl md:rounded-2xl border bg-white/70 dark:bg-[#23272f] p-3 md:p-4 shadow-sm"
+              href={isMissedCalls ? '/dashboard/calls' : '#'}
+              className={isMissedCalls ? 'cursor-pointer' : ''}
             >
-              <div className="flex items-start justify-between mb-3 md:mb-6">
-                <div className="flex-1 min-w-0">
-                  <p className="text-[10px] md:text-xs uppercase tracking-wide text-muted-foreground md:truncate">
-                    {card.label}
-                  </p>
-                  <div className="text-xl md:text-3xl font-bold mt-1 md:mt-2">{card.value}</div>
+              <div
+                className={`rounded-xl md:rounded-2xl border bg-white/70 dark:bg-[#23272f] p-3 md:p-4 shadow-sm ${
+                  isMissedCalls ? 'hover:shadow-md transition-shadow' : ''
+                }`}
+              >
+                <div className="flex items-start justify-between mb-3 md:mb-6">
+                  <div className="flex-1 min-w-0">
+                    <p className="text-[10px] md:text-xs uppercase tracking-wide text-muted-foreground md:truncate">
+                      {card.label}
+                    </p>
+                    <div className="text-xl md:text-3xl font-bold mt-1 md:mt-2">{card.value}</div>
+                  </div>
+                  <div className="rounded-full bg-primary/10 p-1.5 md:p-2 text-primary flex-shrink-0 ml-2 flex items-center justify-center">
+                    <Icon className="h-4 w-4 md:h-5 md:w-5" />
+                  </div>
                 </div>
-                <div className="rounded-full bg-primary/10 p-1.5 md:p-2 text-primary flex-shrink-0 ml-2 flex items-center justify-center">
-                  <Icon className="h-4 w-4 md:h-5 md:w-5" />
-                </div>
+                {card.helper && (
+                  <p className="text-[10px] md:text-xs text-muted-foreground line-clamp-2">{card.helper}</p>
+                )}
               </div>
-              {card.helper && (
-                <p className="text-[10px] md:text-xs text-muted-foreground line-clamp-2">{card.helper}</p>
-              )}
-            </div>
+            </Link>
           );
         })}
       </div>

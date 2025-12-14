@@ -30,9 +30,10 @@ const AVAILABILITY_OPTIONS = [
 
 function SignupForm() {
   const router = useRouter();
-  const { signUp } = useAuth();
+  const { signUp, updateProfile, user: currentUser } = useAuth();
   const searchParams = useSearchParams();
   const roleParam = searchParams?.get("role");
+  const stepParam = searchParams?.get("step");
 
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
@@ -57,14 +58,32 @@ const [resumeUrl, setResumeUrl] = useState("");
 
   const totalSteps = role === "mentor" ? 6 : 5;
 
-  // Load form data from localStorage on mount
+  // Load form data from URL params (for Google sign-in) and localStorage on mount
   useEffect(() => {
+    // First, check URL params (from Google sign-in)
+    const urlStep = stepParam ? parseInt(stepParam) : null;
+    const urlName = searchParams?.get("name");
+    const urlEmail = searchParams?.get("email");
+    const urlProfilePic = searchParams?.get("profilePicUrl");
+    
+    if (urlStep && urlStep >= 2) {
+      setStep(urlStep);
+    }
+    if (urlName) setName(urlName);
+    if (urlEmail) setEmail(urlEmail);
+    if (urlProfilePic) {
+      // Store profilePicUrl - we'll use it when saving
+      localStorage.setItem("google_profile_pic", urlProfilePic);
+    }
+    
+    // Then load from localStorage
     const savedData = localStorage.getItem("signup_form_data");
     if (savedData) {
       try {
         const parsed = JSON.parse(savedData);
-        if (parsed.name) setName(parsed.name);
-        if (parsed.email) setEmail(parsed.email);
+        // Only load from localStorage if URL params didn't override
+        if (!urlName && parsed.name) setName(parsed.name);
+        if (!urlEmail && parsed.email) setEmail(parsed.email);
         if (parsed.password) setPassword(parsed.password);
         if (parsed.role) setRole(parsed.role);
         if (parsed.age) setAge(parsed.age);
@@ -76,12 +95,12 @@ const [resumeUrl, setResumeUrl] = useState("");
         if (parsed.goals) setGoals(parsed.goals);
         if (parsed.availability) setAvailability(parsed.availability);
         if (parsed.interaction) setInteraction(parsed.interaction);
-        if (parsed.step) setStep(parsed.step);
+        if (!urlStep && parsed.step) setStep(parsed.step);
       } catch (e) {
         console.error("Error loading saved form data:", e);
       }
     }
-  }, []);
+  }, [searchParams, stepParam]);
 
   // Save form data to localStorage whenever it changes
   useEffect(() => {
@@ -128,9 +147,16 @@ const [resumeUrl, setResumeUrl] = useState("");
     setSuccess(false);
     
     try {
-      // Validate required fields
-      if (!name || !email || !password) {
+      // Check if coming from Google sign-in (step 2+ means skipped step 1)
+      const isGoogleSignIn = stepParam && parseInt(stepParam) >= 2;
+      
+      // Validate required fields (password not required for Google sign-in)
+      if (!name || !email) {
         throw new Error("Please fill in all required fields");
+      }
+      
+      if (!isGoogleSignIn && !password) {
+        throw new Error("Please enter a password");
       }
       
       // Validate email format
@@ -138,8 +164,8 @@ const [resumeUrl, setResumeUrl] = useState("");
         throw new Error("Please enter a valid email address");
       }
       
-      // Validate password length
-      if (password.length < 6) {
+      // Validate password length (only if not Google sign-in)
+      if (!isGoogleSignIn && password.length < 6) {
         throw new Error("Password must be at least 6 characters long");
       }
       
@@ -147,27 +173,53 @@ const [resumeUrl, setResumeUrl] = useState("");
         throw new Error("Mentors must include a portfolio or resume link");
       }
       
-      // Create user data
-      const userData = {
-        email,
-        password,
-        name,
-        role: role as 'mentor' | 'buddy' | 'mentee',
-        age: age || "",
-        location: location || "",
-        linkedin: linkedin || "",
-        skills: skills || [],
-        interests: interests || [],
-        goals: goals || "",
-        availability: availability || [],
-        interaction: interaction || "",
-        profilePicUrl: "",
-        resumeUrl: resumeUrl.trim(),
-      };
+      // Get profile pic from Google sign-in if available
+      const googleProfilePic = localStorage.getItem("google_profile_pic");
       
-      await signUp(userData);
+      // For Google sign-in users, use updateProfile instead of signUp
+      if (isGoogleSignIn) {
+        if (!currentUser) {
+          throw new Error("Please sign in with Google first");
+        }
+        // User is already authenticated via Google, just update profile
+        await updateProfile({
+          name,
+          role: role as 'mentor' | 'buddy' | 'mentee',
+          age: age || "",
+          location: location || "",
+          linkedin: linkedin || "",
+          skills: skills || [],
+          interests: interests || [],
+          goals: goals || "",
+          availability: availability || [],
+          interaction: interaction || "",
+          profilePicUrl: googleProfilePic || "",
+          resumeUrl: resumeUrl.trim(),
+        });
+      } else {
+        // Regular signup flow
+        const userData = {
+          email,
+          password: password || email, // Fallback to email if no password (shouldn't happen)
+          name,
+          role: role as 'mentor' | 'buddy' | 'mentee',
+          age: age || "",
+          location: location || "",
+          linkedin: linkedin || "",
+          skills: skills || [],
+          interests: interests || [],
+          goals: goals || "",
+          availability: availability || [],
+          interaction: interaction || "",
+          profilePicUrl: googleProfilePic || "",
+          resumeUrl: resumeUrl.trim(),
+        };
+        
+        await signUp(userData);
+      }
       // Clear saved form data on successful signup
       localStorage.removeItem("signup_form_data");
+      localStorage.removeItem("google_profile_pic");
       setSuccess(true);
       setTimeout(() => {
         router.push("/dashboard");
