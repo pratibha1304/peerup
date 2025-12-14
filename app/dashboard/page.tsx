@@ -1,5 +1,5 @@
 "use client";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
@@ -12,6 +12,7 @@ import {
   PhoneMissed,
   Target,
   Users,
+  X,
 } from "lucide-react";
 
 const iconMap: Record<string, any> = {
@@ -27,12 +28,36 @@ export default function DashboardPage() {
   const { user, loading } = useAuth();
   const router = useRouter();
   const stats = useDashboardStats(user);
+  const [dismissedAlerts, setDismissedAlerts] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     if (!loading && !user) {
       router.push("/auth/signin");
     }
   }, [user, loading, router]);
+
+  // Load dismissed alerts from localStorage
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const stored = localStorage.getItem('dismissedAlerts');
+      if (stored) {
+        try {
+          setDismissedAlerts(new Set(JSON.parse(stored)));
+        } catch (e) {
+          // Ignore parse errors
+        }
+      }
+    }
+  }, []);
+
+  const handleDismissAlert = (alertId: string) => {
+    const newDismissed = new Set(dismissedAlerts);
+    newDismissed.add(alertId);
+    setDismissedAlerts(newDismissed);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('dismissedAlerts', JSON.stringify(Array.from(newDismissed)));
+    }
+  };
 
   if (loading || !user) {
     return (
@@ -56,29 +81,38 @@ export default function DashboardPage() {
 
       {stats.alerts.length > 0 && (
         <div className="mb-6 space-y-3">
-          {stats.alerts.map((alert) => (
-            <div
-              key={alert.id}
-              className={`flex flex-col gap-2 rounded-xl border p-4 text-sm ${
-                alert.severity === "warn"
-                  ? "border-amber-400 bg-amber-50 dark:bg-amber-500/10"
-                  : "border-primary/40 bg-primary/5"
-              }`}
-            >
-              <div className="flex items-center gap-2 font-medium">
-                <AlertCircle className="h-4 w-4" />
-                <span>{alert.message}</span>
-              </div>
-              {alert.actionHref && alert.actionLabel && (
-                <Link
-                  href={alert.actionHref}
-                  className="text-xs font-semibold text-primary hover:underline w-fit"
+          {stats.alerts
+            .filter((alert) => !dismissedAlerts.has(alert.id))
+            .map((alert) => (
+              <div
+                key={alert.id}
+                className={`flex flex-col gap-2 rounded-xl border p-4 text-sm relative ${
+                  alert.severity === "warn"
+                    ? "border-amber-400 bg-amber-50 dark:bg-amber-500/10"
+                    : "border-primary/40 bg-primary/5"
+                }`}
+              >
+                <button
+                  onClick={() => handleDismissAlert(alert.id)}
+                  className="absolute top-3 right-3 text-muted-foreground hover:text-foreground transition-colors"
+                  aria-label="Dismiss alert"
                 >
-                  {alert.actionLabel}
-                </Link>
-              )}
-            </div>
-          ))}
+                  <X className="h-4 w-4" />
+                </button>
+                <div className="flex items-center gap-2 font-medium pr-6">
+                  <AlertCircle className="h-4 w-4" />
+                  <span>{alert.message}</span>
+                </div>
+                {alert.actionHref && alert.actionLabel && (
+                  <Link
+                    href={alert.actionHref}
+                    className="text-xs font-semibold text-primary hover:underline w-fit"
+                  >
+                    {alert.actionLabel}
+                  </Link>
+                )}
+              </div>
+            ))}
         </div>
       )}
 

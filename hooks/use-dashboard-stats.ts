@@ -275,7 +275,7 @@ export function useDashboardStats(user: any | null): DashboardStats {
       message: `You missed ${missedCalls} call${missedCalls > 1 ? 's' : ''} this week`,
       severity: 'warn',
       actionLabel: 'Call log',
-      actionHref: '/call',
+      actionHref: '/dashboard/calls',
     })
   }
 
