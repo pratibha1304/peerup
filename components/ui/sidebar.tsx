@@ -176,11 +176,12 @@ export function Sidebar() {
 
   return (
     <aside
-      className={`flex flex-col justify-between h-screen bg-card shadow-xl px-2 py-6 fixed left-0 top-0 z-40 transition-all duration-300 border-r border-border ${
+      className={`flex flex-col h-screen bg-card shadow-xl px-2 py-6 fixed left-0 top-0 z-40 transition-all duration-300 border-r border-border overflow-hidden ${
         effectiveCollapsed ? "w-20" : "w-64"
       }`}
     >
-      <div>
+      {/* Top Section - Logo and Navigation (Scrollable) */}
+      <div className="flex-1 overflow-y-auto min-h-0">
         <div className="flex items-center gap-3 mb-8 px-2">
           <div className="w-8 h-8 bg-gradient-to-br from-primary to-accent rounded-xl flex items-center justify-center">
             <Heart className="w-4 h-4 text-white" />
@@ -208,7 +209,9 @@ export function Sidebar() {
           ))}
         </nav>
       </div>
-      <div className="flex flex-col items-center gap-3 mt-8 mb-2">
+      
+      {/* Bottom Section - Collapse, Profile, Logout (Fixed at bottom) */}
+      <div className="flex flex-col items-center gap-3 mt-4 flex-shrink-0 pt-4 border-t border-border/50">
         {/* Collapse Toggle - Hidden on mobile */}
         <div className="w-full px-2 hidden md:block">
           <button
@@ -220,7 +223,7 @@ export function Sidebar() {
             {!collapsed && <span className="text-sm font-medium">Collapse</span>}
           </button>
         </div>
-        <div className="flex flex-col items-center mt-4 w-full px-2">
+        <div className="flex flex-col items-center w-full px-2">
           <img
             src={user?.profilePicUrl || "/placeholder-user.jpg"}
             alt="User avatar"

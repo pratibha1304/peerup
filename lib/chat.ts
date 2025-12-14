@@ -94,7 +94,7 @@ export async function sendMessage(chatId: string, senderId: string, text: string
       const receiverData = receiverDoc.exists() ? receiverDoc.data() : null;
       
       if (receiverData?.email) {
-        await fetch('/api/email/send', {
+        const response = await fetch('/api/email/send', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -108,9 +108,16 @@ export async function sendMessage(chatId: string, senderId: string, text: string
             }
           })
         });
+        
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}));
+          console.error('Email API error:', response.status, errorData);
+        } else {
+          console.log('✅ Email notification sent for new message');
+        }
       }
     } catch (error) {
-      console.error('Failed to send message email notification:', error);
+      console.error('❌ Failed to send message email notification:', error);
     }
   }
 }

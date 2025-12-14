@@ -48,7 +48,7 @@ export async function sendMatchRequest(receiverId: string) {
   // Send email notification to receiver
   if (receiverData?.email) {
     try {
-      await fetch('/api/email/send', {
+      const response = await fetch('/api/email/send', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -60,9 +60,16 @@ export async function sendMatchRequest(receiverId: string) {
             actionUrl: `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/dashboard/match/requests`
           }
         })
-      })
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        console.error('Email API error:', response.status, errorData);
+      } else {
+        console.log('✅ Email notification sent for match request');
+      }
     } catch (error) {
-      console.error('Failed to send match request email:', error)
+      console.error('❌ Failed to send match request email:', error)
     }
   }
 }
@@ -90,7 +97,7 @@ export async function respondToRequest(requestId: string, accept: boolean) {
   if (requesterData?.email) {
     try {
       const emailType = accept ? 'match_accepted' : 'match_declined'
-      await fetch('/api/email/send', {
+      const response = await fetch('/api/email/send', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -102,7 +109,14 @@ export async function respondToRequest(requestId: string, accept: boolean) {
             actionUrl: `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/dashboard/match/${accept ? 'mutual' : 'requests'}`
           }
         })
-      })
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        console.error('Email API error:', response.status, errorData);
+      } else {
+        console.log(`✅ Email notification sent for match ${accept ? 'acceptance' : 'decline'}`);
+      }
     } catch (error) {
       console.error('Failed to send match response email:', error)
     }

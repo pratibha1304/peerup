@@ -59,7 +59,7 @@ export async function initiateCall(callerId: string, calleeId: string) {
     const calleeData = calleeDoc.exists() ? calleeDoc.data() : null;
     
     if (calleeData?.email) {
-      await fetch('/api/email/send', {
+      const response = await fetch('/api/email/send', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -72,9 +72,16 @@ export async function initiateCall(callerId: string, calleeId: string) {
           }
         })
       });
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        console.error('Email API error:', response.status, errorData);
+      } else {
+        console.log('✅ Email notification sent for incoming call');
+      }
     }
   } catch (error) {
-    console.error('Failed to send call email notification:', error);
+    console.error('❌ Failed to send call email notification:', error);
   }
 
   return partnershipId;

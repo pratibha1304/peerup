@@ -62,7 +62,7 @@ export async function createScheduleRequest(
         });
       }).join(', ');
       
-      await fetch('/api/email/send', {
+      const response = await fetch('/api/email/send', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -76,9 +76,16 @@ export async function createScheduleRequest(
           }
         })
       });
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        console.error('Email API error:', response.status, errorData);
+      } else {
+        console.log('✅ Email notification sent for schedule request');
+      }
     }
   } catch (error) {
-    console.error('Failed to send schedule request email:', error);
+    console.error('❌ Failed to send schedule request email:', error);
   }
 }
 
@@ -111,7 +118,7 @@ export async function confirmScheduleRequest(
         minute: '2-digit',
       });
       
-      await fetch('/api/email/send', {
+      const response = await fetch('/api/email/send', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -125,6 +132,13 @@ export async function confirmScheduleRequest(
           }
         })
       });
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        console.error('Email API error:', response.status, errorData);
+      } else {
+        console.log('✅ Email notification sent for schedule confirmation');
+      }
     }
   } catch (error) {
     console.error('Failed to send schedule confirmation email:', error);
@@ -148,7 +162,7 @@ export async function declineScheduleRequest(requestId: string) {
     const requesterData = requesterDoc.exists() ? requesterDoc.data() : null;
     
     if (requesterData?.email) {
-      await fetch('/api/email/send', {
+      const response = await fetch('/api/email/send', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -161,9 +175,16 @@ export async function declineScheduleRequest(requestId: string) {
           }
         })
       });
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        console.error('Email API error:', response.status, errorData);
+      } else {
+        console.log('✅ Email notification sent for schedule decline');
+      }
     }
   } catch (error) {
-    console.error('Failed to send schedule decline email:', error);
+    console.error('❌ Failed to send schedule decline email:', error);
   }
 }
 
