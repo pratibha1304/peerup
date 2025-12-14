@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useMemo, useState, Suspense } from 'react';
+import { useEffect, useMemo, useState, Suspense, useRef } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
 import { getOrCreateChat, listenToMessages, listenToUserChats, sendMessage, markChatAsRead } from '@/lib/chat';
@@ -14,6 +14,8 @@ function ChatsContent() {
   const [chats, setChats] = useState<any[]>([]);
   const [input, setInput] = useState('');
   const [userNames, setUserNames] = useState<Record<string, string>>({});
+  const [messagesLoading, setMessagesLoading] = useState(false);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const otherUidFromQuery = params.get('u');
 
@@ -67,15 +69,42 @@ function ChatsContent() {
   }, [user, otherUidFromQuery]);
 
   useEffect(() => {
-    if (!currentChatId) return;
-    const unsub = listenToMessages(currentChatId, setMessages);
-    return () => unsub();
+    if (!currentChatId) {
+      setMessages([]);
+      return;
+    }
+    setMessagesLoading(true);
+    const unsub = listenToMessages(currentChatId, (msgs) => {
+      setMessages(msgs);
+      setMessagesLoading(false);
+      // Scroll to bottom when messages load
+      setTimeout(() => {
+        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+      }, 100);
+    });
+    return () => {
+      unsub();
+      setMessagesLoading(false);
+    };
   }, [currentChatId]);
+
+  // Scroll to bottom when new messages arrive
+  useEffect(() => {
+    if (messages.length > 0) {
+      setTimeout(() => {
+        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+      }, 100);
+    }
+  }, [messages]);
 
   const handleSend = async () => {
     if (!user || !currentChatId || !input.trim()) return;
     await sendMessage(currentChatId, user.uid, input.trim());
     setInput('');
+    // Scroll to bottom after sending
+    setTimeout(() => {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }, 100);
   };
 
   const openChat = (chatId: string) => {
@@ -116,7 +145,13 @@ function ChatsContent() {
                     </span>
                   )}
                 </div>
-                <div className="text-xs text-gray-500 truncate">{c.lastMessage || 'No messages yet'}</div>
+                <div className="text-xs text-gray-500 truncate">
+                  {c.lastMessage ? (
+                    <span className="truncate block">{c.lastMessage}</span>
+                  ) : (
+                    'No messages yet'
+                  )}
+                </div>
               </button>
             );
           })}
@@ -128,16 +163,23 @@ function ChatsContent() {
 
       <div className="md:col-span-2 bg-white rounded-2xl border p-4 h-[70vh] flex flex-col">
         <div className="flex-1 overflow-y-auto space-y-3 pr-1">
-          {messages.map((m) => (
-            <div key={m.id} className={`max-w-[75%] px-3 py-2 rounded-2xl text-sm ${(m.senderId === user?.uid || m.senderUid === user?.uid) ? 'ml-auto bg-indigo-600 text-white' : 'bg-gray-100 text-gray-800'}`}>
-              {m.text}
-            </div>
-          ))}
-          {messages.length === 0 && (
-            <div className="text-sm text-gray-500">No messages. Say hello!</div>
+          {messagesLoading && messages.length === 0 ? (
+            <div className="text-sm text-gray-500 text-center py-4">Loading messages...</div>
+          ) : (
+            <>
+              {messages.map((m) => (
+                <div key={m.id} className={`max-w-[75%] px-3 py-2 rounded-2xl text-sm ${(m.senderId === user?.uid || m.senderUid === user?.uid) ? 'ml-auto bg-indigo-600 text-white' : 'bg-gray-100 text-gray-800'}`}>
+                  {m.text}
+                </div>
+              ))}
+              {!messagesLoading && messages.length === 0 && (
+                <div className="text-sm text-gray-500 text-center py-4">No messages. Say hello!</div>
+              )}
+              <div ref={messagesEndRef} />
+            </>
           )}
         </div>
-        <div className="mt-3 flex gap-2">
+        <div className="mt-3 flex gap-3">
           <input
             value={input}
             onChange={(e) => setInput(e.target.value)}

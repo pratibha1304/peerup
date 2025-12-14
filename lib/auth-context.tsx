@@ -135,6 +135,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signOut = async () => {
     try {
+      // Clear all local storage
+      if (typeof window !== 'undefined') {
+        localStorage.clear();
+        sessionStorage.clear();
+      }
+      // Sign out from Firebase
       await firebaseSignOut(auth);
       // User state will be updated by onAuthStateChanged
     } catch (error: any) {

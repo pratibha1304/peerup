@@ -9,7 +9,7 @@ import {
   getPartnershipId,
   type CallRoom,
 } from '@/lib/calling';
-import { doc, getDoc } from 'firebase/firestore';
+import { doc, getDoc, collection, query, where, getDocs, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 
 interface IncomingCallData {
@@ -32,7 +32,54 @@ export function IncomingCallModal() {
   useEffect(() => {
     if (!user) return;
 
+    // Check for old 'ringing' calls on login and mark them as missed
+    const checkOldCalls = async () => {
+      try {
+        const callRoomsRef = collection(db, 'callRooms');
+        const q = query(
+          callRoomsRef,
+          where('calleeId', '==', user.uid),
+          where('status', '==', 'ringing')
+        );
+        const snapshot = await getDocs(q);
+        
+        // Mark old calls as missed (calls older than 30 seconds are considered missed)
+        const now = Date.now();
+        snapshot.docs.forEach(async (docSnap) => {
+          const callData = docSnap.data();
+          // If call was created more than 30 seconds ago, mark as missed
+          const createdAt = callData.createdAt?.toMillis?.() || 0;
+          if (createdAt > 0 && (now - createdAt) > 30000) {
+            await declineCall(docSnap.id);
+          }
+        });
+      } catch (error) {
+        console.error('Error checking old calls:', error);
+      }
+    };
+
+    // Check for old calls when user logs in
+    checkOldCalls();
+
+    // Listen for new incoming calls
     const unsubscribe = listenForIncomingCalls(user.uid, async (callData) => {
+      // Only show calls that are truly new (not old missed calls)
+      const callRoomRef = doc(db, 'callRooms', callData.partnershipId);
+      const callRoomSnap = await getDoc(callRoomRef);
+      
+      if (callRoomSnap.exists()) {
+        const roomData = callRoomSnap.data();
+        const createdAt = roomData.createdAt?.toMillis?.() || 0;
+        const now = Date.now();
+        
+        // If call is older than 30 seconds, don't show it as incoming
+        if (createdAt > 0 && (now - createdAt) > 30000) {
+          // Mark as missed instead
+          await declineCall(callData.partnershipId);
+          return;
+        }
+      }
+
       setIncomingCall({
         partnershipId: callData.partnershipId,
         callerId: callData.callerId,

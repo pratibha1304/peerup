@@ -60,7 +60,15 @@ export default function GoogleSignInButton() {
         }
       }
     } catch (err: any) {
-      setError("Google sign-in failed. Maybe the universe is telling you to try again?");
+      console.error("Google sign-in error:", err);
+      // Handle specific Firebase auth errors
+      if (err.code === 'auth/email-already-in-use' || err.code === 'auth/account-exists-with-different-credential') {
+        setError("This email is already registered. Please sign in with your email and password, or use a different Google account.");
+      } else if (err.code === 'auth/popup-closed-by-user') {
+        setError("Sign-in was cancelled. Please try again.");
+      } else {
+        setError(err.message || "Google sign-in failed. Please try again.");
+      }
     } finally {
       setLoading(false);
     }

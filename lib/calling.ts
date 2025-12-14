@@ -45,6 +45,7 @@ export async function initiateCall(callerId: string, calleeId: string) {
     calleeId,
     offer: null,
     answer: null,
+    createdAt: serverTimestamp(),
   }, { merge: false }); // Force create, not merge
 
   return partnershipId;

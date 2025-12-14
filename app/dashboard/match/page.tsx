@@ -266,10 +266,10 @@ export default function MatchPage() {
                       <button
                         key={tag.value}
                         onClick={() => toggleMultiSelect(tag.value, selectedInterests, setSelectedInterests, 5)}
-                        className={`px-3 py-1 rounded-full text-sm transition-colors ${
+                        className={`px-3 py-1 rounded-full text-sm transition-colors font-medium ${
                           selectedInterests.includes(tag.value)
-                            ? 'bg-pear text-black'
-                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                            ? 'bg-indigo-500 text-white border-2 border-indigo-600'
+                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200 border-2 border-transparent'
                         }`}
                       >
                         {tag.label}
