@@ -44,6 +44,42 @@ export async function createScheduleRequest(
     status: 'pending',
     createdAt: serverTimestamp(),
   });
+
+  // Send email notification to receiver
+  try {
+    const receiverDoc = await getDoc(doc(db, 'users', receiverId));
+    const receiverData = receiverDoc.exists() ? receiverDoc.data() : null;
+    
+    if (receiverData?.email) {
+      const timeStrings = proposedTimes.map((t) => {
+        const date = t.toDate();
+        return date.toLocaleString('en-US', {
+          weekday: 'short',
+          month: 'short',
+          day: 'numeric',
+          hour: 'numeric',
+          minute: '2-digit',
+        });
+      }).join(', ');
+      
+      await fetch('/api/email/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: 'schedule_request',
+          data: {
+            to: receiverData.email,
+            toName: receiverData.name || receiverName,
+            fromName: requesterName,
+            scheduleTime: timeStrings,
+            actionUrl: `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/dashboard/schedule`
+          }
+        })
+      });
+    }
+  } catch (error) {
+    console.error('Failed to send schedule request email:', error);
+  }
 }
 
 export async function confirmScheduleRequest(
@@ -51,17 +87,84 @@ export async function confirmScheduleRequest(
   confirmedTime: Timestamp
 ) {
   const requestRef = doc(db, 'scheduleRequests', requestId);
+  const requestDoc = await getDoc(requestRef);
+  const requestData = requestDoc.exists() ? requestDoc.data() as ScheduleRequest : null;
+  
+  if (!requestData) throw new Error('Schedule request not found');
+  
   await updateDoc(requestRef, {
     status: 'confirmed',
     confirmedTime,
   });
+
+  // Send email notification to requester
+  try {
+    const requesterDoc = await getDoc(doc(db, 'users', requestData.requesterId));
+    const requesterData = requesterDoc.exists() ? requesterDoc.data() : null;
+    
+    if (requesterData?.email) {
+      const timeString = confirmedTime.toDate().toLocaleString('en-US', {
+        weekday: 'long',
+        month: 'long',
+        day: 'numeric',
+        hour: 'numeric',
+        minute: '2-digit',
+      });
+      
+      await fetch('/api/email/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: 'schedule_confirmed',
+          data: {
+            to: requesterData.email,
+            toName: requesterData.name || requestData.requesterName,
+            fromName: requestData.receiverName,
+            scheduleTime: timeString,
+            actionUrl: `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/dashboard/schedule`
+          }
+        })
+      });
+    }
+  } catch (error) {
+    console.error('Failed to send schedule confirmation email:', error);
+  }
 }
 
 export async function declineScheduleRequest(requestId: string) {
   const requestRef = doc(db, 'scheduleRequests', requestId);
+  const requestDoc = await getDoc(requestRef);
+  const requestData = requestDoc.exists() ? requestDoc.data() as ScheduleRequest : null;
+  
+  if (!requestData) throw new Error('Schedule request not found');
+  
   await updateDoc(requestRef, {
     status: 'declined',
   });
+
+  // Send email notification to requester
+  try {
+    const requesterDoc = await getDoc(doc(db, 'users', requestData.requesterId));
+    const requesterData = requesterDoc.exists() ? requesterDoc.data() : null;
+    
+    if (requesterData?.email) {
+      await fetch('/api/email/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: 'schedule_declined',
+          data: {
+            to: requesterData.email,
+            toName: requesterData.name || requestData.requesterName,
+            fromName: requestData.receiverName,
+            actionUrl: `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/dashboard/schedule`
+          }
+        })
+      });
+    }
+  } catch (error) {
+    console.error('Failed to send schedule decline email:', error);
+  }
 }
 
 export function listenToIncomingScheduleRequests(

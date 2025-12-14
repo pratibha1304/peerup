@@ -70,6 +70,8 @@ export async function sendMessage(chatId: string, senderId: string, text: string
   const chatData = chatSnap.exists() ? (chatSnap.data() as Chat) : null;
   const participants = chatData?.participants || [];
   const unreadUpdates: Record<string, any> = {};
+  const receiverId = participants.find((uid) => uid !== senderId);
+  
   participants.forEach((uid) => {
     unreadUpdates[`unreadCounts.${uid}`] = uid === senderId ? 0 : increment(1);
   });
@@ -79,6 +81,38 @@ export async function sendMessage(chatId: string, senderId: string, text: string
     lastMessageSenderId: senderId,
     ...unreadUpdates,
   });
+
+  // Send email notification to receiver
+  if (receiverId) {
+    try {
+      const [senderDoc, receiverDoc] = await Promise.all([
+        getDoc(doc(db, 'users', senderId)),
+        getDoc(doc(db, 'users', receiverId))
+      ]);
+      
+      const senderData = senderDoc.exists() ? senderDoc.data() : null;
+      const receiverData = receiverDoc.exists() ? receiverDoc.data() : null;
+      
+      if (receiverData?.email) {
+        await fetch('/api/email/send', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            type: 'new_message',
+            data: {
+              to: receiverData.email,
+              toName: receiverData.name || 'User',
+              fromName: senderData?.name || 'Someone',
+              message: text.length > 100 ? text.substring(0, 100) + '...' : text,
+              actionUrl: `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/dashboard/chats?u=${senderId}`
+            }
+          })
+        });
+      }
+    } catch (error) {
+      console.error('Failed to send message email notification:', error);
+    }
+  }
 }
 
 export function listenToMessages(chatId: string, cb: (messages: ChatMessage[]) => void) {

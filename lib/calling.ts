@@ -48,6 +48,35 @@ export async function initiateCall(callerId: string, calleeId: string) {
     createdAt: serverTimestamp(),
   }, { merge: false }); // Force create, not merge
 
+  // Send email notification to callee
+  try {
+    const [callerDoc, calleeDoc] = await Promise.all([
+      getDoc(doc(db, 'users', callerId)),
+      getDoc(doc(db, 'users', calleeId))
+    ]);
+    
+    const callerData = callerDoc.exists() ? callerDoc.data() : null;
+    const calleeData = calleeDoc.exists() ? calleeDoc.data() : null;
+    
+    if (calleeData?.email) {
+      await fetch('/api/email/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: 'incoming_call',
+          data: {
+            to: calleeData.email,
+            toName: calleeData.name || 'User',
+            callerName: callerData?.name || 'Someone',
+            actionUrl: `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/call?partner=${partnershipId}&other=${callerId}&caller=false`
+          }
+        })
+      });
+    }
+  } catch (error) {
+    console.error('Failed to send call email notification:', error);
+  }
+
   return partnershipId;
 }
 
