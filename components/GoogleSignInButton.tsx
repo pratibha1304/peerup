@@ -3,7 +3,7 @@ import React, { useState } from "react";
 import { useRouter } from "next/navigation";
 import { auth, db, GoogleAuthProvider } from "@/lib/firebase";
 import { signInWithPopup } from "firebase/auth";
-import { doc, getDoc, setDoc } from "firebase/firestore";
+import { doc, getDoc } from "firebase/firestore";
 import { Button } from "@/components/ui/button";
 
 export default function GoogleSignInButton() {
@@ -24,15 +24,7 @@ export default function GoogleSignInButton() {
       const userSnap = await getDoc(userRef);
       
       if (!userSnap.exists()) {
-        // Create basic user doc with Google data
-        await setDoc(userRef, {
-          uid: user.uid,
-          email: user.email,
-          name: user.displayName || "Mystery Human",
-          profilePicUrl: user.photoURL || "",
-          createdAt: new Date().toISOString(),
-        });
-        // Redirect to onboarding with pre-filled data
+        // No Firestore profile yet - redirect to onboarding with pre-filled data
         const params = new URLSearchParams({
           step: '2',
           name: user.displayName || '',

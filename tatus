@@ -1,0 +1,111 @@
+[1mdiff --git a/app/auth/signup/page.tsx b/app/auth/signup/page.tsx[m
+[1mindex 9f47088..46d7f53 100644[m
+[1m--- a/app/auth/signup/page.tsx[m
+[1m+++ b/app/auth/signup/page.tsx[m
+[36m@@ -2,6 +2,8 @@[m
+ import React, { useState, useEffect, Suspense } from "react";[m
+ import { useRouter, useSearchParams } from "next/navigation";[m
+ import { useAuth } from "@/lib/auth-context";[m
+[32m+[m[32mimport { db } from "@/lib/firebase";[m
+[32m+[m[32mimport { doc, setDoc } from "firebase/firestore";[m
+ import { ArrowLeft, Sparkles, User, Target, FileText, CheckCircle, Eye, EyeOff } from "lucide-react";[m
+ import { Button } from "@/components/ui/button";[m
+ import { Card, CardContent } from "@/components/ui/card";[m
+[36m@@ -30,7 +32,7 @@[m [mconst AVAILABILITY_OPTIONS = [[m
+ [m
+ function SignupForm() {[m
+   const router = useRouter();[m
+[31m-  const { signUp, updateProfile, user: currentUser } = useAuth();[m
+[32m+[m[32m  const { signUp, user: currentUser } = useAuth();[m
+   const searchParams = useSearchParams();[m
+   const roleParam = searchParams?.get("role");[m
+   const stepParam = searchParams?.get("step");[m
+[36m@@ -176,13 +178,15 @@[m [mconst [resumeUrl, setResumeUrl] = useState("");[m
+       // Get profile pic from Google sign-in if available[m
+       const googleProfilePic = localStorage.getItem("google_profile_pic");[m
+       [m
+[31m-      // For Google sign-in users, use updateProfile instead of signUp[m
+[32m+[m[32m      // For Google sign-in users, create/update their Firestore user document directly[m
+       if (isGoogleSignIn) {[m
+[31m-        if (!currentUser) {[m
+[32m+[m[32m        if (!currentUser?.uid) {[m
+           throw new Error("Please sign in with Google first");[m
+         }[m
+[31m-        // User is already authenticated via Google, just update profile[m
+[31m-        await updateProfile({[m
+[32m+[m
+[32m+[m[32m        const newUser = {[m
+[32m+[m[32m          uid: currentUser.uid,[m
+[32m+[m[32m          email,[m
+           name,[m
+           role: role as 'mentor' | 'buddy' | 'mentee',[m
+           age: age || "",[m
+[36m@@ -195,7 +199,11 @@[m [mconst [resumeUrl, setResumeUrl] = useState("");[m
+           interaction: interaction || "",[m
+           profilePicUrl: googleProfilePic || "",[m
+           resumeUrl: resumeUrl.trim(),[m
+[31m-        });[m
+[32m+[m[32m          status: role === "mentor" ? "pending_review" : "active",[m
+[32m+[m[32m          createdAt: new Date().toISOString(),[m
+[32m+[m[32m        };[m
+[32m+[m
+[32m+[m[32m        await setDoc(doc(db, "users", currentUser.uid), newUser);[m
+       } else {[m
+         // Regular signup flow[m
+         const userData = {[m
+[1mdiff --git a/components/GoogleSignInButton.tsx b/components/GoogleSignInButton.tsx[m
+[1mindex b506416..a0e0eef 100644[m
+[1m--- a/components/GoogleSignInButton.tsx[m
+[1m+++ b/components/GoogleSignInButton.tsx[m
+[36m@@ -3,7 +3,7 @@[m [mimport React, { useState } from "react";[m
+ import { useRouter } from "next/navigation";[m
+ import { auth, db, GoogleAuthProvider } from "@/lib/firebase";[m
+ import { signInWithPopup } from "firebase/auth";[m
+[31m-import { doc, getDoc, setDoc } from "firebase/firestore";[m
+[32m+[m[32mimport { doc, getDoc } from "firebase/firestore";[m
+ import { Button } from "@/components/ui/button";[m
+ [m
+ export default function GoogleSignInButton() {[m
+[36m@@ -24,15 +24,7 @@[m [mexport default function GoogleSignInButton() {[m
+       const userSnap = await getDoc(userRef);[m
+       [m
+       if (!userSnap.exists()) {[m
+[31m-        // Create basic user doc with Google data[m
+[31m-        await setDoc(userRef, {[m
+[31m-          uid: user.uid,[m
+[31m-          email: user.email,[m
+[31m-          name: user.displayName || "Mystery Human",[m
+[31m-          profilePicUrl: user.photoURL || "",[m
+[31m-          createdAt: new Date().toISOString(),[m
+[31m-        });[m
+[31m-        // Redirect to onboarding with pre-filled data[m
+[32m+[m[32m        // No Firestore profile yet - redirect to onboarding with pre-filled data[m
+         const params = new URLSearchParams({[m
+           step: '2',[m
+           name: user.displayName || '',[m
+[1mdiff --git a/lib/auth-context.tsx b/lib/auth-context.tsx[m
+[1mindex 3fa687b..6383168 100644[m
+[1m--- a/lib/auth-context.tsx[m
+[1m+++ b/lib/auth-context.tsx[m
+[36m@@ -65,8 +65,9 @@[m [mexport function AuthProvider({ children }: { children: ReactNode }) {[m
+             const userData = userDoc.data() as User;[m
+             setUser(userData);[m
+           } else {[m
+[31m-            // User doesn't exist in Firestore, create basic profile[m
+[31m-            const basicUser: User = {[m
+[32m+[m[32m            // User exists in Firebase Auth (e.g. Google sign-in) but hasn't completed profile yet.[m
+[32m+[m[32m            // Do NOT create a Firestore user document here – we only save to `users` after signup is completed.[m
+[32m+[m[32m            const tempUser: User = {[m
+               uid: firebaseUser.uid,[m
+               email: firebaseUser.email || '',[m
+               name: firebaseUser.displayName || firebaseUser.email?.split('@')[0] || 'User',[m
+[36m@@ -75,8 +76,7 @@[m [mexport function AuthProvider({ children }: { children: ReactNode }) {[m
+               status: 'active',[m
+               createdAt: new Date().toISOString(),[m
+             };[m
+[31m-            await setDoc(doc(db, 'users', firebaseUser.uid), basicUser);[m
+[31m-            setUser(basicUser);[m
+[32m+[m[32m            setUser(tempUser);[m
+           }[m
+         } catch (error) {[m
+           console.error('Error fetching user data:', error);[m

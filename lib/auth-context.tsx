@@ -5,6 +5,7 @@ import {
   signInWithEmailAndPassword, 
   createUserWithEmailAndPassword,
   signOut as firebaseSignOut,
+  sendPasswordResetEmail,
   User as FirebaseUser
 } from 'firebase/auth';
 import { doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
@@ -47,6 +48,7 @@ interface AuthContextType {
   signUp: (userData: Omit<User, 'uid' | 'createdAt' | 'status'>) => Promise<void>;
   signOut: () => Promise<void>;
   updateProfile: (updates: Partial<User>) => Promise<void>;
+  resetPassword: (email: string) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -65,8 +67,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             const userData = userDoc.data() as User;
             setUser(userData);
           } else {
-            // User doesn't exist in Firestore, create basic profile
-            const basicUser: User = {
+            // User exists in Firebase Auth (e.g. Google sign-in) but hasn't completed profile yet.
+            // Do NOT create a Firestore user document here – we only save to `users` after signup is completed.
+            const tempUser: User = {
               uid: firebaseUser.uid,
               email: firebaseUser.email || '',
               name: firebaseUser.displayName || firebaseUser.email?.split('@')[0] || 'User',
@@ -75,8 +78,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               status: 'active',
               createdAt: new Date().toISOString(),
             };
-            await setDoc(doc(db, 'users', firebaseUser.uid), basicUser);
-            setUser(basicUser);
+            setUser(tempUser);
           }
         } catch (error) {
           console.error('Error fetching user data:', error);
@@ -148,6 +150,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const resetPassword = async (email: string) => {
+    try {
+      await sendPasswordResetEmail(auth, email);
+    } catch (error: any) {
+      throw new Error(error.message || 'Failed to send password reset email');
+    }
+  };
+
   const updateProfile = async (updates: Partial<User>) => {
     if (!user) {
       throw new Error('User must be authenticated to update profile');
@@ -178,7 +188,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, signIn, signUp, signOut, updateProfile }}>
+    <AuthContext.Provider value={{ user, loading, signIn, signUp, signOut, updateProfile, resetPassword }}>
       {children}
     </AuthContext.Provider>
   );

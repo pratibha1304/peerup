@@ -12,13 +12,14 @@ import Link from "next/link";
 
 export default function SigninPage() {
   const router = useRouter();
-  const { signIn } = useAuth();
+  const { signIn, resetPassword } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(false);
+  const [resetMessage, setResetMessage] = useState("");
 
   // Load form data from localStorage on mount
   useEffect(() => {
@@ -68,6 +69,7 @@ export default function SigninPage() {
       localStorage.removeItem("signin_email");
       localStorage.removeItem("signin_password");
       setSuccess(true);
+      setResetMessage("");
       setTimeout(() => {
         router.push("/dashboard");
       }, 1000);
@@ -75,6 +77,22 @@ export default function SigninPage() {
       setError(err.message || "Failed to sign in");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleForgotPassword = async () => {
+    try {
+      setError("");
+      setResetMessage("");
+
+      if (!email || !isValidEmail(email)) {
+        throw new Error("Please enter a valid email address above first");
+      }
+
+      await resetPassword(email);
+      setResetMessage("Password reset link sent! Check your email.");
+    } catch (err: any) {
+      setError(err.message || "Failed to send password reset email");
     }
   };
 
@@ -107,6 +125,12 @@ export default function SigninPage() {
               </div>
             )}
 
+            {resetMessage && !error && (
+              <div className="mb-4 p-3 bg-green-500/10 border border-green-500/20 rounded-lg text-green-600 text-sm">
+                {resetMessage}
+              </div>
+            )}
+
             {success && (
               <div className="mb-4 p-3 bg-green-500/10 border border-green-500/20 rounded-lg text-green-600 text-sm">
                 Sign in successful! Redirecting to dashboard...
@@ -129,6 +153,15 @@ export default function SigninPage() {
                     className="pl-10"
                     required
                   />
+                </div>
+                <div className="flex items-center justify-between text-sm mt-1">
+                  <button
+                    type="button"
+                    onClick={handleForgotPassword}
+                    className="text-primary hover:text-primary/80"
+                  >
+                    Forgot password?
+                  </button>
                 </div>
               </div>
 

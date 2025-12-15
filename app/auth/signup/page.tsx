@@ -2,6 +2,8 @@
 import React, { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
+import { db } from "@/lib/firebase";
+import { doc, setDoc } from "firebase/firestore";
 import { ArrowLeft, Sparkles, User, Target, FileText, CheckCircle, Eye, EyeOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -30,7 +32,7 @@ const AVAILABILITY_OPTIONS = [
 
 function SignupForm() {
   const router = useRouter();
-  const { signUp, updateProfile, user: currentUser } = useAuth();
+  const { signUp, user: currentUser } = useAuth();
   const searchParams = useSearchParams();
   const roleParam = searchParams?.get("role");
   const stepParam = searchParams?.get("step");
@@ -176,13 +178,15 @@ const [resumeUrl, setResumeUrl] = useState("");
       // Get profile pic from Google sign-in if available
       const googleProfilePic = localStorage.getItem("google_profile_pic");
       
-      // For Google sign-in users, use updateProfile instead of signUp
+      // For Google sign-in users, create/update their Firestore user document directly
       if (isGoogleSignIn) {
-        if (!currentUser) {
+        if (!currentUser?.uid) {
           throw new Error("Please sign in with Google first");
         }
-        // User is already authenticated via Google, just update profile
-        await updateProfile({
+
+        const newUser = {
+          uid: currentUser.uid,
+          email,
           name,
           role: role as 'mentor' | 'buddy' | 'mentee',
           age: age || "",
@@ -195,7 +199,11 @@ const [resumeUrl, setResumeUrl] = useState("");
           interaction: interaction || "",
           profilePicUrl: googleProfilePic || "",
           resumeUrl: resumeUrl.trim(),
-        });
+          status: role === "mentor" ? "pending_review" : "active",
+          createdAt: new Date().toISOString(),
+        };
+
+        await setDoc(doc(db, "users", currentUser.uid), newUser);
       } else {
         // Regular signup flow
         const userData = {
