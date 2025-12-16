@@ -438,12 +438,16 @@ export default function MentorPage() {
                     Review Requests
                   </button>
                 ) : (() => {
-                  const isPendingToUser = outgoing.some((r: MatchRequest) => r.status === 'pending' && r.receiverId === match.user.uid);
+                  const outgoingRequest = outgoing.find((r: MatchRequest) => 
+                    (r.status === 'pending' || r.status === 'accepted') && 
+                    r.receiverId === match.user.uid
+                  );
                   const isIncomingFromUser = incoming.some((r: MatchRequest) => r.status === 'pending' && r.requesterId === match.user.uid);
-                  if (isPendingToUser) {
+                  if (outgoingRequest) {
+                    const isAccepted = outgoingRequest.status === 'accepted'
                     return (
-                      <button disabled className="flex-1 px-4 py-2 bg-gray-200 text-gray-600 rounded-lg cursor-not-allowed flex items-center justify-center gap-2">
-                        <Send className="w-4 h-4" /> Requested
+                      <button disabled className={`flex-1 px-4 py-2 ${isAccepted ? 'bg-green-200 text-green-700' : 'bg-gray-200 text-gray-600'} rounded-lg cursor-not-allowed flex items-center justify-center gap-2`}>
+                        <Send className="w-4 h-4" /> {isAccepted ? 'Accepted' : 'Requested'}
                       </button>
                     );
                   }

@@ -415,16 +415,17 @@ export default function MatchPage() {
                       </button>
                     ) : (() => {
                       // Check for any pending or accepted request (not just pending)
-                      const hasOutgoingRequest = outgoing.some(r => 
+                      const outgoingRequest = outgoing.find(r => 
                         (r.status === 'pending' || r.status === 'accepted') && 
                         r.receiverId === match.user.uid
                       )
                       const isIncomingFromUser = incoming.some(r => r.status === 'pending' && r.requesterId === match.user.uid)
                       
-                      if (hasOutgoingRequest) {
+                      if (outgoingRequest) {
+                        const isAccepted = outgoingRequest.status === 'accepted'
                         return (
-                          <button disabled className="px-4 py-2 bg-gray-200 text-gray-600 rounded-xl cursor-not-allowed flex items-center gap-2">
-                            <Send className="w-4 h-4" /> Requested
+                          <button disabled className={`px-4 py-2 ${isAccepted ? 'bg-green-200 text-green-700' : 'bg-gray-200 text-gray-600'} rounded-xl cursor-not-allowed flex items-center gap-2`}>
+                            <Send className="w-4 h-4" /> {isAccepted ? 'Accepted' : 'Requested'}
                           </button>
                         )
                       }
