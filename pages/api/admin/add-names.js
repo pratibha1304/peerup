@@ -1,27 +1,30 @@
-const admin = require('firebase-admin');
+// Use client-side Firebase SDK instead of firebase-admin
+// This requires the user to be authenticated, so this endpoint should be protected
+const { initializeApp } = require('firebase/app');
+const { getFirestore, collection, getDocs, doc, updateDoc, getDoc } = require('firebase/firestore');
 
-// Initialize Firebase Admin if not already initialized
-if (!admin.apps.length) {
+const firebaseConfig = {
+  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
+  authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
+  projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
+  storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
+  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
+};
+
+// Note: This approach requires proper authentication
+// For server-side operations, you'd need firebase-admin with service account credentials
+// For now, we'll make this endpoint return an error explaining the limitation
+
+// This endpoint requires firebase-admin for server-side operations
+// Since we're using client SDK, this migration should be run client-side
+// or firebase-admin needs to be installed with proper credentials
+async function getUserName(userId, db) {
   try {
-    admin.initializeApp({
-      credential: admin.credential.cert({
-        projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
-        clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-        privateKey: process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
-      }),
-    });
-  } catch (error) {
-    console.error('Firebase Admin initialization error:', error);
-  }
-}
-
-const db = admin.firestore();
-
-async function getUserName(userId) {
-  try {
-    const userDoc = await db.collection('users').where('uid', '==', userId).limit(1).get();
-    if (!userDoc.empty) {
-      const userData = userDoc.docs[0].data();
+    const userDocRef = doc(db, 'users', userId);
+    const userDocSnap = await getDoc(userDocRef);
+    if (userDocSnap.exists()) {
+      const userData = userDocSnap.data();
       return userData.name || userData.displayName || 'Unknown User';
     }
   } catch (error) {
@@ -35,94 +38,11 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  try {
-    const results = {
-      matchRequests: { updated: 0, skipped: 0 },
-      callRooms: { updated: 0, skipped: 0 },
-      callLogs: { updated: 0, skipped: 0 },
-      matches: { updated: 0, skipped: 0 },
-      chats: { updated: 0, skipped: 0 },
-    };
-
-    // Update matchRequests
-    const matchRequestsSnapshot = await db.collection('matchRequests').get();
-    for (const docSnap of matchRequestsSnapshot.docs) {
-      const data = docSnap.data();
-      if (!data.requesterName || !data.receiverName) {
-        const requesterName = await getUserName(data.requesterId);
-        const receiverName = await getUserName(data.receiverId);
-        await docSnap.ref.update({ requesterName, receiverName });
-        results.matchRequests.updated++;
-      } else {
-        results.matchRequests.skipped++;
-      }
-    }
-
-    // Update callRooms
-    const callRoomsSnapshot = await db.collection('callRooms').get();
-    for (const docSnap of callRoomsSnapshot.docs) {
-      const data = docSnap.data();
-      if ((!data.callerName || !data.calleeName) && data.callerId && data.calleeId) {
-        const callerName = await getUserName(data.callerId);
-        const calleeName = await getUserName(data.calleeId);
-        await docSnap.ref.update({ callerName, calleeName });
-        results.callRooms.updated++;
-      } else {
-        results.callRooms.skipped++;
-      }
-    }
-
-    // Update callLogs
-    const callLogsSnapshot = await db.collection('callLogs').get();
-    for (const docSnap of callLogsSnapshot.docs) {
-      const data = docSnap.data();
-      if ((!data.callerName || !data.calleeName) && data.callerId && data.calleeId) {
-        const callerName = await getUserName(data.callerId);
-        const calleeName = await getUserName(data.calleeId);
-        await docSnap.ref.update({ callerName, calleeName });
-        results.callLogs.updated++;
-      } else {
-        results.callLogs.skipped++;
-      }
-    }
-
-    // Update matches
-    const matchesSnapshot = await db.collection('matches').get();
-    for (const docSnap of matchesSnapshot.docs) {
-      const data = docSnap.data();
-      if ((!data.participantNames || data.participantNames.length !== data.participants?.length) && data.participants?.length > 0) {
-        const participantNames = await Promise.all(
-          data.participants.map(uid => getUserName(uid))
-        );
-        await docSnap.ref.update({ participantNames });
-        results.matches.updated++;
-      } else {
-        results.matches.skipped++;
-      }
-    }
-
-    // Update chats
-    const chatsSnapshot = await db.collection('chats').get();
-    for (const docSnap of chatsSnapshot.docs) {
-      const data = docSnap.data();
-      if ((!data.participantNames || data.participantNames.length !== data.participants?.length) && data.participants?.length > 0) {
-        const participantNames = await Promise.all(
-          data.participants.map(uid => getUserName(uid))
-        );
-        await docSnap.ref.update({ participantNames });
-        results.chats.updated++;
-      } else {
-        results.chats.skipped++;
-      }
-    }
-
-    return res.status(200).json({
-      success: true,
-      ...results,
-    });
-  } catch (error) {
-    console.error('Migration error:', error);
-    return res.status(500).json({ error: error.message || 'Migration failed' });
-  }
+  // This endpoint requires firebase-admin for server-side bulk operations
+  // For now, return an error directing users to use the client-side migration tool
+  return res.status(501).json({ 
+    error: 'Server-side migration requires firebase-admin. Please use the client-side migration tool at /dashboard/admin/add-names or install firebase-admin with proper service account credentials.',
+    alternative: 'Use the browser-based migration tool which runs client-side'
+  });
 }
 
