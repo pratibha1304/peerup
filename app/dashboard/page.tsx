@@ -119,16 +119,29 @@ export default function DashboardPage() {
       <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3 md:gap-4 mb-6 md:mb-8">
               {stats.cards.map((card) => {
           const Icon = iconMap[card.id] || Activity;
-          const isMissedCalls = card.id === 'missedCalls';
+          
+          // Map card IDs to their respective routes
+          const routeMap: Record<string, string> = {
+            messages: '/dashboard/chats',
+            missedCalls: '/dashboard/calls',
+            goals: '/dashboard/goals',
+            requests: '/dashboard/match/requests',
+            matches: '/dashboard/match/mutual',
+            sessions: '/dashboard/schedule',
+          };
+          
+          const cardRoute = routeMap[card.id] || '#';
+          const isClickable = cardRoute !== '#';
+          
           return (
             <Link
               key={card.id}
-              href={isMissedCalls ? '/dashboard/calls' : '#'}
-              className={isMissedCalls ? 'cursor-pointer' : ''}
+              href={cardRoute}
+              className={isClickable ? 'cursor-pointer' : ''}
             >
               <div
                 className={`rounded-xl md:rounded-2xl border bg-white/70 dark:bg-[#23272f] p-3 md:p-4 shadow-sm ${
-                  isMissedCalls ? 'hover:shadow-md transition-shadow' : ''
+                  isClickable ? 'hover:shadow-md transition-shadow' : ''
                 }`}
               >
                 <div className="flex items-start justify-between mb-3 md:mb-6">
@@ -153,29 +166,31 @@ export default function DashboardPage() {
 
       <div className="grid lg:grid-cols-3 gap-4 md:gap-6 mb-6 md:mb-8">
         <div className="lg:col-span-2 space-y-4 md:space-y-6">
-          <div className="rounded-xl md:rounded-2xl border bg-white dark:bg-[#23272f] p-4 md:p-6 shadow-sm">
-            <div className="flex items-center justify-between mb-4">
-              <div>
-                <p className="text-sm uppercase tracking-wide text-muted-foreground">
-                  Goal coverage
-                </p>
-                <h2 className="text-2xl font-semibold">{stats.goalSummary.goalPercent}%</h2>
+          <Link href="/dashboard/goals" className="block">
+            <div className="rounded-xl md:rounded-2xl border bg-white dark:bg-[#23272f] p-4 md:p-6 shadow-sm hover:shadow-md transition-shadow cursor-pointer">
+              <div className="flex items-center justify-between mb-4">
+                <div>
+                  <p className="text-sm uppercase tracking-wide text-muted-foreground">
+                    Goal coverage
+                  </p>
+                  <h2 className="text-2xl font-semibold">{stats.goalSummary.goalPercent}%</h2>
+                </div>
+                <span className="text-sm text-muted-foreground">
+                  {stats.goalSummary.openTasks} open tasks
+                </span>
               </div>
-              <span className="text-sm text-muted-foreground">
-                {stats.goalSummary.openTasks} open tasks
-              </span>
+              <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-3 mb-3">
+                <div
+                  className="bg-gradient-to-r from-[#85BCB1] to-[#645990] h-3 rounded-full transition-all duration-500"
+                  style={{ width: `${stats.goalSummary.goalPercent}%` }}
+                />
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Tracking {stats.goalSummary.totalGoals} goal
+                {stats.goalSummary.totalGoals === 1 ? "" : "s"} across partnerships.
+              </p>
             </div>
-            <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-3 mb-3">
-              <div
-                className="bg-gradient-to-r from-[#85BCB1] to-[#645990] h-3 rounded-full transition-all duration-500"
-                style={{ width: `${stats.goalSummary.goalPercent}%` }}
-              />
-            </div>
-            <p className="text-xs text-muted-foreground">
-              Tracking {stats.goalSummary.totalGoals} goal
-              {stats.goalSummary.totalGoals === 1 ? "" : "s"} across partnerships.
-            </p>
-          </div>
+          </Link>
 
           <div className="rounded-xl md:rounded-2xl border bg-white dark:bg-[#23272f] p-4 md:p-6 shadow-sm">
             <div className="flex items-center justify-between mb-4">
@@ -217,38 +232,39 @@ export default function DashboardPage() {
         </div>
 
         <div className="space-y-4 md:space-y-6">
-          <div className="rounded-xl md:rounded-2xl border bg-white dark:bg-[#23272f] p-4 md:p-6 shadow-sm">
-            <h3 className="text-base md:text-lg font-semibold mb-3 md:mb-4">Upcoming sessions</h3>
-            {stats.upcomingSessions.length === 0 ? (
-              <p className="text-sm text-muted-foreground">No confirmed sessions yet.</p>
-            ) : (
-              <div className="space-y-3">
-                {stats.upcomingSessions.map((session) => (
-                  <div key={session.id} className="rounded-xl border p-4 text-sm">
-                    <p className="font-medium">
-                      {new Date(session.confirmedTime?.toMillis() || 0).toLocaleString()}
-                    </p>
-                    <p className="text-muted-foreground">
-                      {session.requesterName} ↔ {session.receiverName}
-                    </p>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
+          <Link href="/dashboard/schedule" className="block">
+            <div className="rounded-xl md:rounded-2xl border bg-white dark:bg-[#23272f] p-4 md:p-6 shadow-sm hover:shadow-md transition-shadow cursor-pointer">
+              <h3 className="text-base md:text-lg font-semibold mb-3 md:mb-4">Upcoming sessions</h3>
+              {stats.upcomingSessions.length === 0 ? (
+                <p className="text-sm text-muted-foreground">No confirmed sessions yet.</p>
+              ) : (
+                <div className="space-y-3">
+                  {stats.upcomingSessions.map((session) => (
+                    <div key={session.id} className="rounded-xl border p-4 text-sm">
+                      <p className="font-medium">
+                        {new Date(session.confirmedTime?.toMillis() || 0).toLocaleString()}
+                      </p>
+                      <p className="text-muted-foreground">
+                        {session.requesterName} ↔ {session.receiverName}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </Link>
 
-          <div className="rounded-xl md:rounded-2xl border bg-white dark:bg-[#23272f] p-4 md:p-6 shadow-sm">
-            <h3 className="text-base md:text-lg font-semibold mb-2">Match requests</h3>
-            <p className="text-sm text-muted-foreground mb-4">
-              {stats.requests.incoming} incoming • {stats.requests.outgoing} outgoing
-            </p>
-            <Link
-              href="/dashboard/match/requests"
-              className="text-sm font-semibold text-primary hover:underline"
-            >
-              Review requests
-            </Link>
-          </div>
+          <Link href="/dashboard/match/requests" className="block">
+            <div className="rounded-xl md:rounded-2xl border bg-white dark:bg-[#23272f] p-4 md:p-6 shadow-sm hover:shadow-md transition-shadow cursor-pointer">
+              <h3 className="text-base md:text-lg font-semibold mb-2">Match requests</h3>
+              <p className="text-sm text-muted-foreground mb-4">
+                {stats.requests.incoming} incoming • {stats.requests.outgoing} outgoing
+              </p>
+              <span className="text-sm font-semibold text-primary hover:underline">
+                Review requests →
+              </span>
+            </div>
+          </Link>
         </div>
       </div>
 
