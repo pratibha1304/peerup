@@ -44,6 +44,75 @@ export default function CallPage() {
   const remoteAudioRef = useRef<HTMLAudioElement>(null);
   const candidateListenersRef = useRef<any[]>([]);
 
+  const initializeCall = async (partnerId: string, otherId: string, caller: boolean, withVideo: boolean) => {
+    try {
+      setIsLoading(true);
+
+      // Start local stream (video for scheduled meetings, audio-only for regular calls)
+      const stream = await startCallLocalStream(withVideo);
+      
+      // Ensure audio tracks are enabled
+      stream.getAudioTracks().forEach(track => {
+        track.enabled = true;
+        console.log('Local audio track:', { id: track.id, enabled: track.enabled, muted: track.muted });
+      });
+      
+      setLocalStream(stream);
+      setVideoEnabled(withVideo && stream.getVideoTracks()[0]?.enabled !== false);
+      setAudioEnabled(stream.getAudioTracks()[0]?.enabled !== false);
+
+      // Create peer connection
+      const peerConnection = createPeerConnection();
+      peerConnectionRef.current = peerConnection;
+
+      // Add local tracks
+      addLocalTracksToPeer(peerConnection, stream);
+
+      // Handle remote stream
+      handleRemoteStream(peerConnection, setRemoteStream);
+
+      // Listen for ICE candidates
+      const candidateListener = listenForIceCandidates(
+        partnerId,
+        peerConnection,
+        caller ? 'offerCandidates' : 'answerCandidates'
+      );
+      candidateListenersRef.current.push(candidateListener);
+
+      if (caller) {
+        // Caller: create offer
+        const offer = await createOffer(peerConnection);
+        await saveOfferToFirestore(partnerId, offer);
+
+        // Listen for answer
+        const unsubscribe = listenToCallRoom(partnerId, async (data) => {
+          if (data.answer && !peerConnection.currentRemoteDescription) {
+            await peerConnection.setRemoteDescription(new RTCSessionDescription(data.answer));
+          }
+        });
+        candidateListenersRef.current.push(unsubscribe);
+      } else {
+        // Callee: listen for offer and create answer
+        const unsubscribe = listenToCallRoom(partnerId, async (data) => {
+          if (data.offer && !peerConnection.currentRemoteDescription) {
+            const answer = await createAnswer(peerConnection, data.offer);
+            await saveAnswerToFirestore(partnerId, answer);
+          }
+        });
+        candidateListenersRef.current.push(unsubscribe);
+      }
+
+      setIsLoading(false);
+    } catch (error) {
+      console.error('Error initializing call:', error);
+      const errorMsg = withVideo 
+        ? 'Failed to start video call. Make sure camera and microphone permissions are granted.'
+        : 'Failed to start call. Make sure microphone permissions are granted.';
+      alert(errorMsg);
+      router.push('/dashboard/chats');
+    }
+  };
+
   useEffect(() => {
     if (!user) return;
 
@@ -77,7 +146,7 @@ export default function CallPage() {
     });
 
     initializeCall(partnerId, otherId, caller, video);
-  }, [user]);
+  }, [user, router]);
 
   // Handle video elements for video calls
   useEffect(() => {
@@ -183,75 +252,6 @@ export default function CallPage() {
 
     return () => unsubscribe();
   }, [partnershipId, localStream, remoteStream, router]);
-
-  const initializeCall = async (partnerId: string, otherId: string, caller: boolean, withVideo: boolean) => {
-    try {
-      setIsLoading(true);
-
-      // Start local stream (video for scheduled meetings, audio-only for regular calls)
-      const stream = await startCallLocalStream(withVideo);
-      
-      // Ensure audio tracks are enabled
-      stream.getAudioTracks().forEach(track => {
-        track.enabled = true;
-        console.log('Local audio track:', { id: track.id, enabled: track.enabled, muted: track.muted });
-      });
-      
-      setLocalStream(stream);
-      setVideoEnabled(withVideo && stream.getVideoTracks()[0]?.enabled !== false);
-      setAudioEnabled(stream.getAudioTracks()[0]?.enabled !== false);
-
-      // Create peer connection
-      const peerConnection = createPeerConnection();
-      peerConnectionRef.current = peerConnection;
-
-      // Add local tracks
-      addLocalTracksToPeer(peerConnection, stream);
-
-      // Handle remote stream
-      handleRemoteStream(peerConnection, setRemoteStream);
-
-      // Listen for ICE candidates
-      const candidateListener = listenForIceCandidates(
-        partnerId,
-        peerConnection,
-        caller ? 'offerCandidates' : 'answerCandidates'
-      );
-      candidateListenersRef.current.push(candidateListener);
-
-      if (caller) {
-        // Caller: create offer
-        const offer = await createOffer(peerConnection);
-        await saveOfferToFirestore(partnerId, offer);
-
-        // Listen for answer
-        const unsubscribe = listenToCallRoom(partnerId, async (data) => {
-          if (data.answer && !peerConnection.currentRemoteDescription) {
-            await peerConnection.setRemoteDescription(new RTCSessionDescription(data.answer));
-          }
-        });
-        candidateListenersRef.current.push(unsubscribe);
-      } else {
-        // Callee: listen for offer and create answer
-        const unsubscribe = listenToCallRoom(partnerId, async (data) => {
-          if (data.offer && !peerConnection.currentRemoteDescription) {
-            const answer = await createAnswer(peerConnection, data.offer);
-            await saveAnswerToFirestore(partnerId, answer);
-          }
-        });
-        candidateListenersRef.current.push(unsubscribe);
-      }
-
-      setIsLoading(false);
-    } catch (error) {
-      console.error('Error initializing call:', error);
-      const errorMsg = isVideoCall 
-        ? 'Failed to start video call. Make sure camera and microphone permissions are granted.'
-        : 'Failed to start call. Make sure microphone permissions are granted.';
-      alert(errorMsg);
-      router.push('/dashboard/chats');
-    }
-  };
 
   const handleEndCall = async () => {
     // Stop local stream immediately
@@ -369,7 +369,6 @@ export default function CallPage() {
               <div className="text-white text-xl">Waiting for {otherUserName || otherUserId} to join...</div>
             )}
           </div>
-        </>
       )}
 
       {/* Controls */}
