@@ -26,8 +26,11 @@ export type CallRoom = {
   answer?: any;
 };
 
-const stunServers = {
-  iceServers: [{ urls: 'stun:stun.l.google.com:19302' }],
+const stunServers: RTCConfiguration = {
+  iceServers: [
+    { urls: 'stun:stun.l.google.com:19302' },
+    { urls: 'stun:stun1.l.google.com:19302' },
+  ],
 };
 
 export function getPartnershipId(uidA: string, uidB: string): string {
@@ -201,8 +204,61 @@ export function addLocalTracksToPeer(
   peerConnection: RTCPeerConnection,
   localStream: MediaStream
 ) {
-  localStream.getTracks().forEach((track) => {
-    peerConnection.addTrack(track, localStream);
+  const tracks = localStream.getTracks();
+  console.log('Adding local tracks to peer connection:', {
+    totalTracks: tracks.length,
+    audioTracks: tracks.filter(t => t.kind === 'audio').length,
+    videoTracks: tracks.filter(t => t.kind === 'video').length,
+  });
+  
+  tracks.forEach((track) => {
+    // Ensure track is enabled before adding
+    track.enabled = true;
+    
+    console.log(`Adding ${track.kind} track:`, {
+      id: track.id,
+      kind: track.kind,
+      enabled: track.enabled,
+      muted: track.muted,
+      readyState: track.readyState,
+    });
+    
+    const sender = peerConnection.addTrack(track, localStream);
+    
+    // Monitor track state
+    track.onended = () => {
+      console.warn(`Local ${track.kind} track ended:`, track.id);
+    };
+    
+    track.onmute = () => {
+      console.warn(`Local ${track.kind} track muted:`, track.id);
+    };
+    
+    track.onunmute = () => {
+      console.log(`Local ${track.kind} track unmuted:`, track.id);
+    };
+    
+    // For audio tracks, monitor if they're actually sending data
+    if (track.kind === 'audio') {
+      // Check track state periodically
+      const checkAudioState = () => {
+        console.log('Local audio track state:', {
+          id: track.id,
+          enabled: track.enabled,
+          muted: track.muted,
+          readyState: track.readyState,
+        });
+      };
+      
+      // Check immediately and after a delay
+      checkAudioState();
+      setTimeout(checkAudioState, 2000);
+    }
+  });
+  
+  console.log('Peer connection senders after adding tracks:', {
+    senders: peerConnection.getSenders().length,
+    transceivers: peerConnection.getTransceivers().length,
   });
 }
 

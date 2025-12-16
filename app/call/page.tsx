@@ -52,10 +52,32 @@ export default function CallPage() {
       // Start local stream (video for scheduled meetings, audio-only for regular calls)
       const stream = await startCallLocalStream(withVideo);
       
-      // Ensure audio tracks are enabled
-      stream.getAudioTracks().forEach(track => {
+      // Ensure audio tracks are enabled and monitor them
+      const audioTracks = stream.getAudioTracks();
+      console.log('Local stream audio tracks:', audioTracks.length);
+      
+      audioTracks.forEach(track => {
         track.enabled = true;
-        console.log('Local audio track:', { id: track.id, enabled: track.enabled, muted: track.muted });
+        console.log('Local audio track configured:', { 
+          id: track.id, 
+          enabled: track.enabled, 
+          muted: track.muted,
+          readyState: track.readyState,
+          settings: track.getSettings ? track.getSettings() : 'N/A',
+        });
+        
+        // Monitor track state changes
+        track.onended = () => {
+          console.error('❌ Local audio track ended unexpectedly!');
+        };
+        
+        track.onmute = () => {
+          console.warn('⚠️ Local audio track was muted!');
+        };
+        
+        track.onunmute = () => {
+          console.log('✅ Local audio track unmuted');
+        };
       });
       
       setLocalStream(stream);
@@ -65,9 +87,28 @@ export default function CallPage() {
       // Create peer connection
       const peerConnection = createPeerConnection();
       peerConnectionRef.current = peerConnection;
+      
+      // Monitor peer connection state
+      peerConnection.onconnectionstatechange = () => {
+        console.log('Peer connection state:', peerConnection.connectionState);
+      };
+      
+      peerConnection.oniceconnectionstatechange = () => {
+        console.log('ICE connection state:', peerConnection.iceConnectionState);
+      };
 
       // Add local tracks
       addLocalTracksToPeer(peerConnection, stream);
+      
+      // Verify tracks were added
+      setTimeout(() => {
+        const senders = peerConnection.getSenders();
+        console.log('Peer connection senders:', senders.map(s => ({
+          track: s.track?.kind,
+          trackId: s.track?.id,
+          trackEnabled: s.track?.enabled,
+        })));
+      }, 1000);
 
       // Handle remote stream
       handleRemoteStream(peerConnection, setRemoteStream);
