@@ -161,12 +161,19 @@ export default function CallPage() {
       // Ensure video element plays audio too
       remoteVideoRef.current.muted = false;
       remoteVideoRef.current.volume = 1.0;
+      
+      // Force play video (which includes audio)
+      remoteVideoRef.current.play().catch(err => {
+        console.error('Error playing remote video:', err);
+      });
     }
   }, [remoteStream, isVideoCall]);
 
   // Handle remote audio stream (for both video and voice calls)
   useEffect(() => {
-    if (remoteAudioRef.current && remoteStream) {
+    if (!remoteAudioRef.current) return;
+
+    if (remoteStream) {
       // Check if stream has audio tracks
       const audioTracks = remoteStream.getAudioTracks();
       console.log('Remote stream received:', {
@@ -177,31 +184,95 @@ export default function CallPage() {
       });
       
       if (audioTracks.length > 0) {
-        // Ensure all audio tracks are enabled
+        const audioElement = remoteAudioRef.current;
+        
+        // Ensure all audio tracks are enabled and monitor their state
         audioTracks.forEach(track => {
           track.enabled = true;
-          console.log('Enabled remote audio track:', track.id);
+          console.log('Enabled remote audio track:', {
+            id: track.id,
+            enabled: track.enabled,
+            muted: track.muted,
+            readyState: track.readyState,
+            kind: track.kind,
+          });
+          
+          // Monitor track state changes
+          track.onended = () => {
+            console.warn('Audio track ended:', track.id);
+          };
+          
+          track.onmute = () => {
+            console.warn('Audio track muted:', track.id);
+          };
+          
+          track.onunmute = () => {
+            console.log('Audio track unmuted:', track.id);
+          };
         });
         
-        remoteAudioRef.current.srcObject = remoteStream;
-        // Ensure audio element is unmuted and volume is set
-        remoteAudioRef.current.muted = false;
-        remoteAudioRef.current.volume = 1.0;
+        // Set the stream to the audio element
+        // Clear any existing stream first to ensure clean state
+        if (audioElement.srcObject) {
+          audioElement.srcObject = null;
+        }
         
-        // Play audio
-        const playAudio = () => {
-          if (remoteAudioRef.current) {
-            remoteAudioRef.current.play().catch(error => {
-              console.error('Error playing remote audio:', error);
-              // Try again after a short delay (autoplay policy might block it)
-              setTimeout(() => {
-                if (remoteAudioRef.current) {
-                  remoteAudioRef.current.play().catch(err => {
-                    console.error('Retry play failed:', err);
-                  });
-                }
-              }, 500);
+        // Small delay to ensure cleanup, then set new stream
+        setTimeout(() => {
+          if (audioElement && remoteStream) {
+            audioElement.srcObject = remoteStream;
+            
+            // Ensure audio element is unmuted and volume is set
+            audioElement.muted = false;
+            audioElement.volume = 1.0;
+            
+            console.log('Audio element configured:', {
+              muted: audioElement.muted,
+              volume: audioElement.volume,
+              srcObject: !!audioElement.srcObject,
+              paused: audioElement.paused,
+              readyState: audioElement.readyState,
             });
+            
+            // Try to play immediately
+            audioElement.play().catch(err => {
+              console.error('Immediate play failed:', err);
+            });
+          }
+        }, 50);
+        
+        // Force play the audio
+        const playAudio = async () => {
+          if (!audioElement) return;
+          
+          try {
+            // Check if already playing
+            if (!audioElement.paused) {
+              console.log('Audio already playing');
+              return;
+            }
+            
+            await audioElement.play();
+            console.log('✅ Audio playback started successfully');
+          } catch (error: any) {
+            console.error('❌ Error playing remote audio:', error);
+            console.error('Error details:', {
+              name: error.name,
+              message: error.message,
+              code: error.code,
+            });
+            
+            // Try again after a short delay (autoplay policy might block it)
+            setTimeout(async () => {
+              if (audioElement && audioElement.srcObject) {
+                try {
+                  await audioElement.play();
+                  console.log('✅ Audio playback started on retry');
+                } catch (err: any) {
+                  console.error('❌ Retry play failed:', err);
+                }
+              }
+            }, 500);
           }
         };
         
@@ -209,17 +280,29 @@ export default function CallPage() {
         playAudio();
         
         // Also try when audio element is ready
-        if (remoteAudioRef.current.readyState >= 2) {
+        const handleCanPlay = () => {
+          console.log('Audio element can play, attempting playback');
           playAudio();
-        } else {
-          remoteAudioRef.current.addEventListener('loadeddata', playAudio, { once: true });
-        }
+        };
+        
+        audioElement.addEventListener('canplay', handleCanPlay, { once: true });
+        audioElement.addEventListener('loadeddata', handleCanPlay, { once: true });
+        audioElement.addEventListener('loadedmetadata', handleCanPlay, { once: true });
+        
+        // Cleanup function
+        return () => {
+          audioElement.removeEventListener('canplay', handleCanPlay);
+          audioElement.removeEventListener('loadeddata', handleCanPlay);
+          audioElement.removeEventListener('loadedmetadata', handleCanPlay);
+        };
       } else {
         console.warn('Remote stream has no audio tracks');
       }
-    } else if (remoteAudioRef.current && !remoteStream) {
+    } else {
       // Clear audio when stream is removed
-      remoteAudioRef.current.srcObject = null;
+      if (remoteAudioRef.current) {
+        remoteAudioRef.current.srcObject = null;
+      }
     }
   }, [remoteStream]);
 
@@ -317,7 +400,15 @@ export default function CallPage() {
         autoPlay
         playsInline
         muted={false}
+        volume={1.0}
         style={{ display: 'none' }}
+        onLoadedData={() => {
+          if (remoteAudioRef.current && remoteAudioRef.current.srcObject) {
+            remoteAudioRef.current.play().catch(err => {
+              console.error('Autoplay blocked, will retry:', err);
+            });
+          }
+        }}
       />
       
       {isVideoCall ? (
