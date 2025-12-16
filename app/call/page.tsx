@@ -89,18 +89,70 @@ export default function CallPage() {
   useEffect(() => {
     if (remoteVideoRef.current && remoteStream && isVideoCall) {
       remoteVideoRef.current.srcObject = remoteStream;
+      // Ensure video element plays audio too
+      remoteVideoRef.current.muted = false;
+      remoteVideoRef.current.volume = 1.0;
     }
   }, [remoteStream, isVideoCall]);
 
-  // Handle remote audio stream for voice calls
+  // Handle remote audio stream (for both video and voice calls)
   useEffect(() => {
-    if (remoteAudioRef.current && remoteStream && !isVideoCall) {
-      remoteAudioRef.current.srcObject = remoteStream;
-      remoteAudioRef.current.play().catch(error => {
-        console.error('Error playing remote audio:', error);
+    if (remoteAudioRef.current && remoteStream) {
+      // Check if stream has audio tracks
+      const audioTracks = remoteStream.getAudioTracks();
+      console.log('Remote stream received:', {
+        hasAudio: audioTracks.length > 0,
+        audioTrackCount: audioTracks.length,
+        audioTracks: audioTracks.map(t => ({ id: t.id, enabled: t.enabled, muted: t.muted, kind: t.kind })),
+        streamId: remoteStream.id,
       });
+      
+      if (audioTracks.length > 0) {
+        // Ensure all audio tracks are enabled
+        audioTracks.forEach(track => {
+          track.enabled = true;
+          console.log('Enabled remote audio track:', track.id);
+        });
+        
+        remoteAudioRef.current.srcObject = remoteStream;
+        // Ensure audio element is unmuted and volume is set
+        remoteAudioRef.current.muted = false;
+        remoteAudioRef.current.volume = 1.0;
+        
+        // Play audio
+        const playAudio = () => {
+          if (remoteAudioRef.current) {
+            remoteAudioRef.current.play().catch(error => {
+              console.error('Error playing remote audio:', error);
+              // Try again after a short delay (autoplay policy might block it)
+              setTimeout(() => {
+                if (remoteAudioRef.current) {
+                  remoteAudioRef.current.play().catch(err => {
+                    console.error('Retry play failed:', err);
+                  });
+                }
+              }, 500);
+            });
+          }
+        };
+        
+        // Try to play immediately
+        playAudio();
+        
+        // Also try when audio element is ready
+        if (remoteAudioRef.current.readyState >= 2) {
+          playAudio();
+        } else {
+          remoteAudioRef.current.addEventListener('loadeddata', playAudio, { once: true });
+        }
+      } else {
+        console.warn('Remote stream has no audio tracks');
+      }
+    } else if (remoteAudioRef.current && !remoteStream) {
+      // Clear audio when stream is removed
+      remoteAudioRef.current.srcObject = null;
     }
-  }, [remoteStream, isVideoCall]);
+  }, [remoteStream]);
 
   useEffect(() => {
     if (!partnershipId) return;
@@ -138,8 +190,16 @@ export default function CallPage() {
 
       // Start local stream (video for scheduled meetings, audio-only for regular calls)
       const stream = await startCallLocalStream(withVideo);
+      
+      // Ensure audio tracks are enabled
+      stream.getAudioTracks().forEach(track => {
+        track.enabled = true;
+        console.log('Local audio track:', { id: track.id, enabled: track.enabled, muted: track.muted });
+      });
+      
       setLocalStream(stream);
       setVideoEnabled(withVideo && stream.getVideoTracks()[0]?.enabled !== false);
+      setAudioEnabled(stream.getAudioTracks()[0]?.enabled !== false);
 
       // Create peer connection
       const peerConnection = createPeerConnection();
@@ -251,6 +311,15 @@ export default function CallPage() {
 
   return (
     <div className="fixed inset-0 bg-gray-900 z-50">
+      {/* Audio element for remote audio (works for both video and voice calls) */}
+      <audio
+        ref={remoteAudioRef}
+        autoPlay
+        playsInline
+        muted={false}
+        style={{ display: 'none' }}
+      />
+      
       {isVideoCall ? (
         /* Video call UI */
         <>
@@ -276,6 +345,7 @@ export default function CallPage() {
                 ref={remoteVideoRef}
                 autoPlay
                 playsInline
+                muted={false}
                 className="w-full h-full object-cover"
               />
             ) : (
@@ -287,17 +357,7 @@ export default function CallPage() {
         </>
       ) : (
         /* Voice-only call UI */
-        <>
-          {/* Hidden audio element to play remote audio stream */}
-          {remoteStream && (
-            <audio
-              ref={remoteAudioRef}
-              autoPlay
-              playsInline
-              style={{ display: 'none' }}
-            />
-          )}
-          <div className="flex items-center justify-center w-full h-full">
+        <div className="flex items-center justify-center w-full h-full">
             {isLoading ? (
               <div className="text-white text-xl">Connecting...</div>
             ) : remoteStream ? (

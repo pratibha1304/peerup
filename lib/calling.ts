@@ -285,7 +285,22 @@ export function handleRemoteStream(
   setRemoteStream: (stream: MediaStream | null) => void
 ) {
   peerConnection.ontrack = (event) => {
-    setRemoteStream(event.streams[0]);
+    const stream = event.streams[0];
+    console.log('Received remote track:', {
+      kind: event.track.kind,
+      id: event.track.id,
+      enabled: event.track.enabled,
+      streamId: stream?.id,
+      audioTracks: stream?.getAudioTracks().length,
+      videoTracks: stream?.getVideoTracks().length,
+    });
+    
+    // Ensure audio tracks are enabled
+    stream?.getAudioTracks().forEach(track => {
+      track.enabled = true;
+    });
+    
+    setRemoteStream(stream);
   };
 }
 
