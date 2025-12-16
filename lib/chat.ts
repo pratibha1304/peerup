@@ -44,8 +44,17 @@ export async function getOrCreateChat(currentUid: string, otherUid: string) {
   const chatRef = doc(db, 'chats', chatId);
   const snap = await getDoc(chatRef);
   if (!snap.exists()) {
+    // Fetch user names
+    const [currentUserDoc, otherUserDoc] = await Promise.all([
+      getDoc(doc(db, 'users', currentUid)),
+      getDoc(doc(db, 'users', otherUid))
+    ]);
+    const currentUserName = currentUserDoc.exists() ? currentUserDoc.data()?.name : 'Unknown User';
+    const otherUserName = otherUserDoc.exists() ? otherUserDoc.data()?.name : 'Unknown User';
+    
     await setDoc(chatRef, {
       participants: [currentUid, otherUid],
+      participantNames: [currentUserName, otherUserName],
       lastMessage: '',
       lastMessageAt: serverTimestamp(),
       unreadCounts: {

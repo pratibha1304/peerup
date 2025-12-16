@@ -38,11 +38,22 @@ export async function initiateCall(callerId: string, calleeId: string) {
   const partnershipId = getPartnershipId(callerId, calleeId);
   const callRoomRef = doc(db, 'callRooms', partnershipId);
 
+  // Get user data for names and email
+  const [callerDoc, calleeDoc] = await Promise.all([
+    getDoc(doc(db, 'users', callerId)),
+    getDoc(doc(db, 'users', calleeId))
+  ]);
+  
+  const callerData = callerDoc.exists() ? callerDoc.data() : null;
+  const calleeData = calleeDoc.exists() ? calleeDoc.data() : null;
+
   // Clean up old data and set status to ringing
   await setDoc(callRoomRef, {
     status: 'ringing',
     callerId,
+    callerName: callerData?.name || 'Unknown User',
     calleeId,
+    calleeName: calleeData?.name || 'Unknown User',
     offer: null,
     answer: null,
     createdAt: serverTimestamp(),
@@ -50,13 +61,6 @@ export async function initiateCall(callerId: string, calleeId: string) {
 
   // Send email notification to callee
   try {
-    const [callerDoc, calleeDoc] = await Promise.all([
-      getDoc(doc(db, 'users', callerId)),
-      getDoc(doc(db, 'users', calleeId))
-    ]);
-    
-    const callerData = callerDoc.exists() ? callerDoc.data() : null;
-    const calleeData = calleeDoc.exists() ? calleeDoc.data() : null;
     
     if (calleeData?.email) {
       const response = await fetch('/api/email/send', {
@@ -300,10 +304,21 @@ async function logCallOutcome(
   if (endedBy) participantsSet.add(endedBy);
   const participants = Array.from(participantsSet);
 
+  // Fetch user names for the log
+  const userIds = [callData.callerId, callData.calleeId].filter(Boolean);
+  const userDocs = await Promise.all(
+    userIds.map(uid => getDoc(doc(db, 'users', uid)))
+  );
+  
+  const callerName = userDocs[0]?.exists() ? userDocs[0].data()?.name : 'Unknown User';
+  const calleeName = userDocs[1]?.exists() ? userDocs[1].data()?.name : 'Unknown User';
+
   await addDoc(logsRef, {
     partnershipId,
     callerId: callData.callerId,
+    callerName: callerName || 'Unknown User',
     calleeId: callData.calleeId,
+    calleeName: calleeName || 'Unknown User',
     participants: participants.sort(),
     status: outcome,
     endedBy: endedBy || null,

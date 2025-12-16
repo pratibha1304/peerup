@@ -40,7 +40,9 @@ export async function sendMatchRequest(receiverId: string) {
   
   await addDoc(collection(db, 'matchRequests'), {
     requesterId,
+    requesterName: requesterData?.name || 'Unknown User',
     receiverId,
+    receiverName: receiverData?.name || 'Unknown User',
     status: 'pending',
     createdAt: serverTimestamp(),
   })
@@ -82,22 +84,27 @@ export async function respondToRequest(requestId: string, accept: boolean) {
   
   if (!requestData) throw new Error('Request not found')
   
+  // Verify the current user is the receiver
+  if (requestData.receiverId !== auth.currentUser.uid) {
+    throw new Error('Only the receiver can respond to match requests')
+  }
+  
+  // Update the request status first (critical operation)
   await updateDoc(ref, { status: accept ? 'accepted' : 'declined' })
   
-  // Get user data for email notifications
-  const [requesterDoc, receiverDoc] = await Promise.all([
+  // Send email notification asynchronously (non-blocking)
+  // Don't await this - let it run in the background
+  Promise.all([
     getDoc(doc(db, 'users', requestData.requesterId)),
     getDoc(doc(db, 'users', requestData.receiverId))
-  ])
-  
-  const requesterData = requesterDoc.exists() ? requesterDoc.data() : null
-  const receiverData = receiverDoc.exists() ? receiverDoc.data() : null
-  
-  // Send email to requester about the response
-  if (requesterData?.email) {
-    try {
+  ]).then(([requesterDoc, receiverDoc]) => {
+    const requesterData = requesterDoc.exists() ? requesterDoc.data() : null
+    const receiverData = receiverDoc.exists() ? receiverDoc.data() : null
+    
+    // Send email to requester about the response
+    if (requesterData?.email) {
       const emailType = accept ? 'match_accepted' : 'match_declined'
-      const response = await fetch('/api/email/send', {
+      fetch('/api/email/send', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -109,18 +116,19 @@ export async function respondToRequest(requestId: string, accept: boolean) {
             actionUrl: `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/dashboard/match/${accept ? 'mutual' : 'requests'}`
           }
         })
+      }).then(response => {
+        if (!response.ok) {
+          return response.json().catch(() => ({}));
+        } else {
+          console.log(`✅ Email notification sent for match ${accept ? 'acceptance' : 'decline'}`);
+        }
+      }).catch(error => {
+        console.error('Failed to send match response email:', error)
       });
-      
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        console.error('Email API error:', response.status, errorData);
-      } else {
-        console.log(`✅ Email notification sent for match ${accept ? 'acceptance' : 'decline'}`);
-      }
-    } catch (error) {
-      console.error('Failed to send match response email:', error)
     }
-  }
+  }).catch(error => {
+    console.error('Failed to fetch user data for email:', error)
+  })
 }
 
 export async function cancelMatchRequest(requestId: string) {
@@ -143,8 +151,19 @@ export async function createMatchFor(request: { requesterId: string; receiverId:
   const ref = doc(db, 'matches', partnershipId)
   // Ensure participants is a proper array with both users for Firestore rule check
   const participants = [request.requesterId, request.receiverId].sort()
+  
+  // Fetch user names
+  const [requesterDoc, receiverDoc] = await Promise.all([
+    getDoc(doc(db, 'users', request.requesterId)),
+    getDoc(doc(db, 'users', request.receiverId))
+  ])
+  const requesterName = requesterDoc.exists() ? requesterDoc.data()?.name : 'Unknown User'
+  const receiverName = receiverDoc.exists() ? receiverDoc.data()?.name : 'Unknown User'
+  const participantNames = [requesterName, receiverName].sort()
+  
   await setDoc(ref, {
     participants: participants,
+    participantNames: participantNames,
     matchType: request.matchType,
     menteeId: request.matchType === 'mentor' ? (request.menteeId || request.receiverId) : null,
     createdAt: serverTimestamp(),

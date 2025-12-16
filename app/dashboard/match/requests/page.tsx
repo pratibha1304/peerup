@@ -39,10 +39,13 @@ export default function MatchRequestsPage() {
       
       if (userIds.size === 0) return
       
+      // Filter out already loaded user IDs
+      const userIdsToLoad = Array.from(userIds).filter(uid => !userNames[uid])
+      if (userIdsToLoad.length === 0) return
+      
       const entries: [string, string][] = []
       await Promise.all(
-        Array.from(userIds).map(async (uid) => {
-          if (userNames[uid]) return // Already loaded
+        userIdsToLoad.map(async (uid) => {
           try {
             const snap = await getDoc(doc(db, 'users', uid))
             if (snap.exists()) {
@@ -56,13 +59,15 @@ export default function MatchRequestsPage() {
           }
         })
       )
-      setUserNames((prev) => ({ ...prev, ...Object.fromEntries(entries) }))
+      if (entries.length > 0) {
+        setUserNames((prev) => ({ ...prev, ...Object.fromEntries(entries) }))
+      }
     }
     
     if (incoming.length > 0 || outgoing.length > 0) {
       loadUserNames()
     }
-  }, [incoming, outgoing, user, userNames])
+  }, [incoming, outgoing, user]) // Removed userNames from dependencies to prevent infinite loop
 
   const pendingIncoming = useMemo(() => incoming.filter(r => r.status === 'pending'), [incoming])
   const pendingOutgoing = useMemo(() => outgoing.filter(r => r.status === 'pending'), [outgoing])
