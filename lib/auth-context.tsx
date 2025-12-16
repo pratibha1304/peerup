@@ -115,9 +115,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signUp = async (userData: Omit<User, 'uid' | 'createdAt' | 'status'>) => {
     try {
+      // Ensure password is provided and valid
+      if (!userData.password || userData.password.length < 6) {
+        throw new Error('Password is required and must be at least 6 characters long');
+      }
       // Create Firebase auth user with the actual password
-      const password = userData.password || userData.email; // Use provided password or fallback to email
-      const userCredential = await createUserWithEmailAndPassword(auth, userData.email, password);
+      const userCredential = await createUserWithEmailAndPassword(auth, userData.email, userData.password);
       
       // Create user document in Firestore (without password)
       const { password: _, ...userDataWithoutPassword } = userData;

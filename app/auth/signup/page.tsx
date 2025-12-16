@@ -205,10 +205,13 @@ const [resumeUrl, setResumeUrl] = useState("");
 
         await setDoc(doc(db, "users", currentUser.uid), newUser);
       } else {
-        // Regular signup flow
+        // Regular signup flow - ensure password is provided
+        if (!password || password.length < 6) {
+          throw new Error("Password is required and must be at least 6 characters long");
+        }
         const userData = {
           email,
-          password: password || email, // Fallback to email if no password (shouldn't happen)
+          password, // Use the actual password entered by user
           name,
           role: role as 'mentor' | 'buddy' | 'mentee',
           age: age || "",

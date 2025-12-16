@@ -3,8 +3,8 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 import { initiateCall, getPartnershipId } from "@/lib/calling";
-import { Users, Filter, Search, Star, MapPin, Calendar, MessageCircle, RefreshCw, User, Heart, Sparkles, Phone, Video, Send, Inbox } from "lucide-react";
-import { sendMatchRequest, listenOutgoingRequests, listenIncomingRequests, MatchRequest } from '@/lib/matchRequests'
+import { Users, Filter, Search, Star, MapPin, Calendar, MessageCircle, RefreshCw, User, Heart, Sparkles, Phone, Video, Send, Inbox, X } from "lucide-react";
+import { sendMatchRequest, listenOutgoingRequests, listenIncomingRequests, cancelMatchRequest, MatchRequest } from '@/lib/matchRequests'
 import { PROFILE_TAGS } from "@/lib/profile-options";
 interface MatchResult {
   user: any;
@@ -423,9 +423,31 @@ export default function MatchPage() {
                       
                       if (outgoingRequest) {
                         const isAccepted = outgoingRequest.status === 'accepted'
+                        if (isAccepted) {
+                          return (
+                            <button disabled className="px-4 py-2 bg-green-200 text-green-700 rounded-xl cursor-not-allowed flex items-center gap-2">
+                              <Send className="w-4 h-4" /> Accepted
+                            </button>
+                          )
+                        }
+                        // Pending request - show cancel button
                         return (
-                          <button disabled className={`px-4 py-2 ${isAccepted ? 'bg-green-200 text-green-700' : 'bg-gray-200 text-gray-600'} rounded-xl cursor-not-allowed flex items-center gap-2`}>
-                            <Send className="w-4 h-4" /> {isAccepted ? 'Accepted' : 'Requested'}
+                          <button
+                            onClick={async () => {
+                              if (!user) return;
+                              if (!confirm('Are you sure you want to cancel this match request?')) return;
+                              try {
+                                await cancelMatchRequest(outgoingRequest.id)
+                                // State will update via listener
+                              } catch (e: any) {
+                                console.error(e)
+                                alert(e.message || 'Failed to cancel request')
+                              }
+                            }}
+                            className="px-4 py-2 bg-red-500 hover:bg-red-600 text-white rounded-xl transition-colors flex items-center gap-2"
+                            title="Cancel match request"
+                          >
+                            <X className="w-4 h-4" /> Cancel Request
                           </button>
                         )
                       }

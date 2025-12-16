@@ -106,8 +106,8 @@ service cloud.firestore {
       allow read: if request.auth != null && (request.auth.uid == resource.data.requesterId || request.auth.uid == resource.data.receiverId);
       // Update allowed only by receiver to change status
       allow update: if request.auth != null && request.auth.uid == resource.data.receiverId;
-      // No deletes from client
-      allow delete: if false;
+      // Delete allowed only by requester for pending requests
+      allow delete: if request.auth != null && request.auth.uid == resource.data.requesterId && resource.data.status == 'pending';
     }
   }
 }

@@ -1,5 +1,5 @@
 import { db, auth } from '@/lib/firebase'
-import { addDoc, collection, doc, getDoc, onSnapshot, query, serverTimestamp, setDoc, updateDoc, where } from 'firebase/firestore'
+import { addDoc, collection, doc, getDoc, onSnapshot, query, serverTimestamp, setDoc, updateDoc, where, deleteDoc } from 'firebase/firestore'
 import { getPartnershipId } from '@/lib/calling'
 
 export type MatchRequest = {
@@ -121,6 +121,20 @@ export async function respondToRequest(requestId: string, accept: boolean) {
       console.error('Failed to send match response email:', error)
     }
   }
+}
+
+export async function cancelMatchRequest(requestId: string) {
+  if (!auth.currentUser) throw new Error('Not signed in')
+  const requesterId = auth.currentUser.uid
+  const ref = doc(db, 'matchRequests', requestId)
+  const requestDoc = await getDoc(ref)
+  const requestData = requestDoc.exists() ? requestDoc.data() as MatchRequest : null
+  
+  if (!requestData) throw new Error('Request not found')
+  if (requestData.requesterId !== requesterId) throw new Error('You can only cancel your own requests')
+  if (requestData.status !== 'pending') throw new Error('Can only cancel pending requests')
+  
+  await deleteDoc(ref)
 }
 
 export async function createMatchFor(request: { requesterId: string; receiverId: string; matchType: 'buddy' | 'mentor'; menteeId?: string | null }) {

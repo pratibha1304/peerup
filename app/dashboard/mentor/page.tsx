@@ -3,8 +3,8 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { auth, db } from "@/lib/firebase";
 import { doc, getDoc, collection, getDocs } from "firebase/firestore";
-import { GraduationCap, Filter, Search, Star, MapPin, Calendar, MessageCircle, RefreshCw, Award, Clock, User, Send, Inbox, FileText, ExternalLink } from "lucide-react";
-import { sendMatchRequest, listenIncomingRequests, listenOutgoingRequests, MatchRequest } from '@/lib/matchRequests';
+import { GraduationCap, Filter, Search, Star, MapPin, Calendar, MessageCircle, RefreshCw, Award, Clock, User, Send, Inbox, FileText, ExternalLink, X } from "lucide-react";
+import { sendMatchRequest, listenIncomingRequests, listenOutgoingRequests, cancelMatchRequest, MatchRequest } from '@/lib/matchRequests';
 import { PROFILE_TAGS } from "@/lib/profile-options";
 
 // Simple matching function
@@ -445,9 +445,32 @@ export default function MentorPage() {
                   const isIncomingFromUser = incoming.some((r: MatchRequest) => r.status === 'pending' && r.requesterId === match.user.uid);
                   if (outgoingRequest) {
                     const isAccepted = outgoingRequest.status === 'accepted'
+                    if (isAccepted) {
+                      return (
+                        <button disabled className="flex-1 px-4 py-2 bg-green-200 text-green-700 rounded-lg cursor-not-allowed flex items-center justify-center gap-2">
+                          <Send className="w-4 h-4" /> Accepted
+                        </button>
+                      );
+                    }
+                    // Pending request - show cancel button
                     return (
-                      <button disabled className={`flex-1 px-4 py-2 ${isAccepted ? 'bg-green-200 text-green-700' : 'bg-gray-200 text-gray-600'} rounded-lg cursor-not-allowed flex items-center justify-center gap-2`}>
-                        <Send className="w-4 h-4" /> {isAccepted ? 'Accepted' : 'Requested'}
+                      <button
+                        onClick={async () => {
+                          const user = auth.currentUser;
+                          if (!user) return;
+                          if (!confirm('Are you sure you want to cancel this match request?')) return;
+                          try {
+                            await cancelMatchRequest(outgoingRequest.id);
+                            // State will update via listener
+                          } catch (e: any) {
+                            console.error(e);
+                            alert(e.message || 'Failed to cancel request');
+                          }
+                        }}
+                        className="flex-1 px-4 py-2 bg-red-500 hover:bg-red-600 text-white rounded-lg flex items-center justify-center gap-2 transition-colors"
+                        title="Cancel match request"
+                      >
+                        <X className="w-4 h-4" /> Cancel Request
                       </button>
                     );
                   }
