@@ -41,6 +41,7 @@ export default function CallPage() {
   const peerConnectionRef = useRef<RTCPeerConnection | null>(null);
   const localVideoRef = useRef<HTMLVideoElement>(null);
   const remoteVideoRef = useRef<HTMLVideoElement>(null);
+  const remoteAudioRef = useRef<HTMLAudioElement>(null);
   const candidateListenersRef = useRef<any[]>([]);
 
   useEffect(() => {
@@ -88,6 +89,16 @@ export default function CallPage() {
   useEffect(() => {
     if (remoteVideoRef.current && remoteStream && isVideoCall) {
       remoteVideoRef.current.srcObject = remoteStream;
+    }
+  }, [remoteStream, isVideoCall]);
+
+  // Handle remote audio stream for voice calls
+  useEffect(() => {
+    if (remoteAudioRef.current && remoteStream && !isVideoCall) {
+      remoteAudioRef.current.srcObject = remoteStream;
+      remoteAudioRef.current.play().catch(error => {
+        console.error('Error playing remote audio:', error);
+      });
     }
   }, [remoteStream, isVideoCall]);
 
@@ -276,18 +287,29 @@ export default function CallPage() {
         </>
       ) : (
         /* Voice-only call UI */
-        <div className="flex items-center justify-center w-full h-full">
-          {isLoading ? (
-            <div className="text-white text-xl">Connecting...</div>
-          ) : remoteStream ? (
-            <div className="text-center">
-              <div className="text-3xl text-white font-semibold mb-2">On voice call</div>
-              <div className="text-gray-300">With {otherUserName || otherUserId}</div>
-            </div>
-          ) : (
-            <div className="text-white text-xl">Waiting for {otherUserName || otherUserId} to join...</div>
+        <>
+          {/* Hidden audio element to play remote audio stream */}
+          {remoteStream && (
+            <audio
+              ref={remoteAudioRef}
+              autoPlay
+              playsInline
+              style={{ display: 'none' }}
+            />
           )}
-        </div>
+          <div className="flex items-center justify-center w-full h-full">
+            {isLoading ? (
+              <div className="text-white text-xl">Connecting...</div>
+            ) : remoteStream ? (
+              <div className="text-center">
+                <div className="text-3xl text-white font-semibold mb-2">On voice call</div>
+                <div className="text-gray-300">With {otherUserName || otherUserId}</div>
+              </div>
+            ) : (
+              <div className="text-white text-xl">Waiting for {otherUserName || otherUserId} to join...</div>
+            )}
+          </div>
+        </>
       )}
 
       {/* Controls */}
