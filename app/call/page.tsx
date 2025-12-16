@@ -43,6 +43,7 @@ export default function CallPage() {
   const remoteVideoRef = useRef<HTMLVideoElement>(null);
   const remoteAudioRef = useRef<HTMLAudioElement>(null);
   const candidateListenersRef = useRef<any[]>([]);
+  const audioContextRef = useRef<AudioContext | null>(null);
 
   const initializeCall = async (partnerId: string, otherId: string, caller: boolean, withVideo: boolean) => {
     try {
@@ -232,10 +233,57 @@ export default function CallPage() {
               srcObject: !!audioElement.srcObject,
               paused: audioElement.paused,
               readyState: audioElement.readyState,
+              currentTime: audioElement.currentTime,
+              duration: audioElement.duration,
             });
             
+            // Create AudioContext to analyze the stream
+            if (!audioContextRef.current) {
+              audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
+            }
+            
+            // Create an analyser to check if audio is actually flowing
+            const analyser = audioContextRef.current.createAnalyser();
+            const source = audioContextRef.current.createMediaStreamSource(remoteStream);
+            source.connect(analyser);
+            analyser.fftSize = 256;
+            const dataArray = new Uint8Array(analyser.frequencyBinCount);
+            
+            // Check audio levels periodically
+            const checkAudioLevels = () => {
+              analyser.getByteFrequencyData(dataArray);
+              const average = dataArray.reduce((a, b) => a + b) / dataArray.length;
+              const max = Math.max(...Array.from(dataArray));
+              console.log('Audio levels:', { average: average.toFixed(2), max, hasData: max > 0 });
+              
+              if (max > 0) {
+                console.log('✅ Audio data detected in stream!');
+              } else {
+                console.warn('⚠️ No audio data detected in stream - remote user may not be speaking or mic may be muted');
+              }
+            };
+            
+            // Check audio levels every second
+            const audioCheckInterval = setInterval(checkAudioLevels, 1000);
+            
+            // Cleanup interval when component unmounts or stream changes
+            setTimeout(() => {
+              clearInterval(audioCheckInterval);
+            }, 30000); // Check for 30 seconds
+            
             // Try to play immediately
-            audioElement.play().catch(err => {
+            audioElement.play().then(() => {
+              console.log('Audio play() resolved');
+              // Verify it's actually playing
+              setTimeout(() => {
+                console.log('Audio element state after play:', {
+                  paused: audioElement.paused,
+                  currentTime: audioElement.currentTime,
+                  muted: audioElement.muted,
+                  volume: audioElement.volume,
+                });
+              }, 1000);
+            }).catch(err => {
               console.error('Immediate play failed:', err);
             });
           }
@@ -248,12 +296,44 @@ export default function CallPage() {
           try {
             // Check if already playing
             if (!audioElement.paused) {
-              console.log('Audio already playing');
+              console.log('Audio already playing - verifying state:', {
+                paused: audioElement.paused,
+                muted: audioElement.muted,
+                volume: audioElement.volume,
+                currentTime: audioElement.currentTime,
+                srcObject: !!audioElement.srcObject,
+              });
+              
+              // Even if playing, verify it's not muted and volume is correct
+              if (audioElement.muted) {
+                console.warn('⚠️ Audio element is muted! Unmuting...');
+                audioElement.muted = false;
+              }
+              if (audioElement.volume === 0) {
+                console.warn('⚠️ Audio element volume is 0! Setting to 1...');
+                audioElement.volume = 1.0;
+              }
+              
+              // Force play again to ensure it's actually playing
+              await audioElement.play();
+              console.log('✅ Re-confirmed audio playback');
               return;
             }
             
             await audioElement.play();
             console.log('✅ Audio playback started successfully');
+            
+            // Verify playback state after a moment
+            setTimeout(() => {
+              if (audioElement) {
+                console.log('Post-play verification:', {
+                  paused: audioElement.paused,
+                  muted: audioElement.muted,
+                  volume: audioElement.volume,
+                  currentTime: audioElement.currentTime,
+                });
+              }
+            }, 500);
           } catch (error: any) {
             console.error('❌ Error playing remote audio:', error);
             console.error('Error details:', {
