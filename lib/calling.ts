@@ -225,6 +225,17 @@ export function addLocalTracksToPeer(
     
     const sender = peerConnection.addTrack(track, localStream);
     
+    // CRITICAL: Configure transceiver to ensure audio is sent
+    const transceivers = peerConnection.getTransceivers();
+    const transceiver = transceivers.find(t => t.sender === sender);
+    if (transceiver) {
+      // Set direction to sendrecv for audio to ensure bidirectional communication
+      if (track.kind === 'audio') {
+        transceiver.direction = 'sendrecv';
+        console.log('✅ Audio transceiver configured for sendrecv');
+      }
+    }
+    
     // Monitor track state
     track.onended = () => {
       console.warn(`Local ${track.kind} track ended:`, track.id);
@@ -240,25 +251,44 @@ export function addLocalTracksToPeer(
     
     // For audio tracks, monitor if they're actually sending data
     if (track.kind === 'audio') {
-      // Check track state periodically
-      const checkAudioState = () => {
-        console.log('Local audio track state:', {
-          id: track.id,
-          enabled: track.enabled,
-          muted: track.muted,
-          readyState: track.readyState,
-        });
-      };
-      
-      // Check immediately and after a delay
-      checkAudioState();
-      setTimeout(checkAudioState, 2000);
+      // Monitor sender statistics to verify audio is being sent
+      setInterval(async () => {
+        try {
+          const stats = await sender.getStats();
+          stats.forEach((report) => {
+            if (report.type === 'outbound-rtp' && report.mediaType === 'audio') {
+              console.log('Audio transmission stats:', {
+                bytesSent: report.bytesSent,
+                packetsSent: report.packetsSent,
+                packetsLost: report.packetsLost,
+                roundTripTime: report.roundTripTime,
+              });
+            }
+          });
+        } catch (error) {
+          console.error('Error getting sender stats:', error);
+        }
+      }, 3000);
+    }
+  });
+  
+  // Ensure all transceivers are properly configured
+  peerConnection.getTransceivers().forEach((transceiver) => {
+    if (transceiver.sender.track?.kind === 'audio') {
+      if (transceiver.direction !== 'sendrecv' && transceiver.direction !== 'sendonly') {
+        transceiver.direction = 'sendrecv';
+        console.log('✅ Fixed audio transceiver direction to sendrecv');
+      }
     }
   });
   
   console.log('Peer connection senders after adding tracks:', {
     senders: peerConnection.getSenders().length,
     transceivers: peerConnection.getTransceivers().length,
+    transceiverDirections: peerConnection.getTransceivers().map(t => ({
+      kind: t.sender.track?.kind,
+      direction: t.direction,
+    })),
   });
 }
 

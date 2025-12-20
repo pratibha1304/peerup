@@ -1,10 +1,11 @@
 "use client";
 import { useEffect, useMemo, useState, Suspense, useRef } from 'react';
-import { useSearchParams } from 'next/navigation';
+import { useSearchParams, useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
 import { getOrCreateChat, listenToMessages, listenToUserChats, sendMessage, markChatAsRead } from '@/lib/chat';
 import { db } from '@/lib/firebase';
 import { doc, getDoc } from 'firebase/firestore';
+import { ArrowLeft } from 'lucide-react';
 
 function ChatsContent() {
   const { user } = useAuth();
@@ -179,11 +180,10 @@ function ChatsContent() {
             <div className="px-4 py-3 border-b flex items-center gap-3">
               <button
                 onClick={() => setCurrentChatId(null)}
-                className="md:hidden p-2 hover:bg-gray-100 rounded-lg"
+                className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                title="Back to chats"
               >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                </svg>
+                <ArrowLeft className="w-5 h-5 text-gray-600" />
               </button>
               {(() => {
                 const otherId = chats.find(c => c.id === currentChatId)?.participants?.find((p: string) => p !== user?.uid) || '';
