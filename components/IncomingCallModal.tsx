@@ -29,6 +29,8 @@ export function IncomingCallModal() {
   const [callerProfile, setCallerProfile] = useState<CallerProfile | null>(null);
   const [isResponding, setIsResponding] = useState(false);
   const incomingCallRef = useRef<IncomingCallData | null>(null);
+  const ringtoneRef = useRef<HTMLAudioElement | null>(null);
+  const ringtoneIntervalRef = useRef<NodeJS.Timeout | null>(null);
   
   // Keep ref in sync with state
   useEffect(() => {
@@ -137,9 +139,75 @@ export function IncomingCallModal() {
     };
   }, [user]);
 
+  // Play ringtone for incoming calls
+  useEffect(() => {
+    if (incomingCall && !isResponding) {
+      const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+      
+      const playTone = () => {
+        try {
+          const oscillator1 = audioContext.createOscillator();
+          const oscillator2 = audioContext.createOscillator();
+          const gainNode = audioContext.createGain();
+          
+          oscillator1.frequency.value = 800;
+          oscillator2.frequency.value = 1000;
+          gainNode.gain.value = 0.3;
+          
+          oscillator1.connect(gainNode);
+          oscillator2.connect(gainNode);
+          gainNode.connect(audioContext.destination);
+          
+          oscillator1.start();
+          oscillator2.start();
+          
+          // Stop after 0.4 seconds
+          setTimeout(() => {
+            oscillator1.stop();
+            oscillator2.stop();
+          }, 400);
+        } catch (error) {
+          console.error('Error playing ringtone:', error);
+        }
+      };
+      
+      // Play immediately
+      playTone();
+      
+      // Play every 1 second
+      ringtoneIntervalRef.current = setInterval(() => {
+        if (incomingCall && !isResponding) {
+          playTone();
+        }
+      }, 1000);
+      
+      return () => {
+        if (ringtoneIntervalRef.current) {
+          clearInterval(ringtoneIntervalRef.current);
+          ringtoneIntervalRef.current = null;
+        }
+        if (audioContext.state !== 'closed') {
+          audioContext.close().catch(() => {});
+        }
+      };
+    } else {
+      // Stop ringtone
+      if (ringtoneIntervalRef.current) {
+        clearInterval(ringtoneIntervalRef.current);
+        ringtoneIntervalRef.current = null;
+      }
+    }
+  }, [incomingCall, isResponding]);
+
   const handleAccept = async () => {
     if (!incomingCall) return;
     setIsResponding(true);
+    
+    // Stop ringtone
+    if (ringtoneIntervalRef.current) {
+      clearInterval(ringtoneIntervalRef.current);
+      ringtoneIntervalRef.current = null;
+    }
 
     try {
       await acceptCall(incomingCall.partnershipId);
@@ -155,6 +223,12 @@ export function IncomingCallModal() {
   const handleDecline = async () => {
     if (!incomingCall) return;
     setIsResponding(true);
+    
+    // Stop ringtone
+    if (ringtoneIntervalRef.current) {
+      clearInterval(ringtoneIntervalRef.current);
+      ringtoneIntervalRef.current = null;
+    }
 
     try {
       await declineCall(incomingCall.partnershipId);

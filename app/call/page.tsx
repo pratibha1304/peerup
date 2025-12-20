@@ -44,6 +44,8 @@ export default function CallPage() {
   const remoteAudioRef = useRef<HTMLAudioElement>(null);
   const candidateListenersRef = useRef<any[]>([]);
   const audioContextRef = useRef<AudioContext | null>(null);
+  const ringtoneRef = useRef<HTMLAudioElement>(null);
+  const ringtoneIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   const initializeCall = async (partnerId: string, otherId: string, caller: boolean, withVideo: boolean) => {
     try {
@@ -123,13 +125,17 @@ export default function CallPage() {
 
       if (caller) {
         // Caller: create offer
+        console.log('Caller: Creating offer...');
         const offer = await createOffer(peerConnection);
         await saveOfferToFirestore(partnerId, offer);
+        console.log('Caller: Offer created and saved');
 
         // Listen for answer
         const unsubscribe = listenToCallRoom(partnerId, async (data) => {
           if (data.answer && !peerConnection.currentRemoteDescription) {
+            console.log('Caller: Received answer, setting remote description...');
             await peerConnection.setRemoteDescription(new RTCSessionDescription(data.answer));
+            console.log('Caller: Remote description set');
           }
         });
         candidateListenersRef.current.push(unsubscribe);
@@ -173,7 +179,8 @@ export default function CallPage() {
     setOtherUserId(otherId);
     setIsCaller(caller);
     setIsVideoCall(video);
-    setCallStatus(caller ? 'ringing' : 'connected');
+    // Set initial status - callee should wait for connection, caller is ringing
+    setCallStatus(caller ? 'ringing' : 'ringing');
 
     // Fetch other user's name
     getDoc(doc(db, 'users', otherId)).then((snap) => {
@@ -210,6 +217,87 @@ export default function CallPage() {
       });
     }
   }, [remoteStream, isVideoCall]);
+
+  // Update call status when remote stream is received
+  useEffect(() => {
+    if (remoteStream && (callStatus === 'ringing' || callStatus === 'connected')) {
+      // Only update to connected if we have a remote stream
+      setCallStatus('connected');
+      console.log('✅ Remote stream received, call connected');
+      
+      // Stop ringtone when connected
+      if (ringtoneIntervalRef.current) {
+        clearInterval(ringtoneIntervalRef.current);
+        ringtoneIntervalRef.current = null;
+      }
+    }
+  }, [remoteStream, callStatus]);
+
+  // Play ringtone for incoming/outgoing calls
+  useEffect(() => {
+    if (callStatus === 'ringing' && !isLoading) {
+      // Generate ringtone using Web Audio API
+      const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+      let oscillator1: OscillatorNode | null = null;
+      let oscillator2: OscillatorNode | null = null;
+      let gainNode: GainNode | null = null;
+      
+      const playTone = () => {
+        try {
+          oscillator1 = audioContext.createOscillator();
+          oscillator2 = audioContext.createOscillator();
+          gainNode = audioContext.createGain();
+          
+          oscillator1.frequency.value = 800;
+          oscillator2.frequency.value = 1000;
+          gainNode.gain.value = 0.3;
+          
+          oscillator1.connect(gainNode);
+          oscillator2.connect(gainNode);
+          gainNode.connect(audioContext.destination);
+          
+          oscillator1.start();
+          oscillator2.start();
+          
+          // Stop after 0.4 seconds
+          setTimeout(() => {
+            if (oscillator1) oscillator1.stop();
+            if (oscillator2) oscillator2.stop();
+          }, 400);
+        } catch (error) {
+          console.error('Error playing ringtone:', error);
+        }
+      };
+      
+      // Play immediately
+      playTone();
+      
+      // Play every 1 second
+      ringtoneIntervalRef.current = setInterval(() => {
+        if (callStatus === 'ringing' && !isLoading) {
+          playTone();
+        }
+      }, 1000);
+      
+      return () => {
+        if (ringtoneIntervalRef.current) {
+          clearInterval(ringtoneIntervalRef.current);
+          ringtoneIntervalRef.current = null;
+        }
+        if (oscillator1) try { oscillator1.stop(); } catch (e) {}
+        if (oscillator2) try { oscillator2.stop(); } catch (e) {}
+        if (audioContext.state !== 'closed') {
+          audioContext.close().catch(() => {});
+        }
+      };
+    } else {
+      // Stop ringtone when not ringing
+      if (ringtoneIntervalRef.current) {
+        clearInterval(ringtoneIntervalRef.current);
+        ringtoneIntervalRef.current = null;
+      }
+    }
+  }, [callStatus, isLoading]);
 
   // Handle remote audio stream (for both video and voice calls)
   useEffect(() => {
@@ -431,7 +519,18 @@ export default function CallPage() {
     if (!partnershipId) return;
 
     const unsubscribe = listenToCallRoom(partnershipId, (data) => {
-      setCallStatus(data.status);
+      // Update status based on Firestore, but 'connected' only when we have remote stream
+      if (data.status === 'connected') {
+        // Only show connected if we have remote stream, otherwise keep ringing
+        if (remoteStream) {
+          setCallStatus('connected');
+        } else {
+          // Status says connected but no stream yet - still connecting
+          setCallStatus('ringing');
+        }
+      } else {
+        setCallStatus(data.status);
+      }
 
       if (data.status === 'ended') {
         // Stop streams and cleanup immediately
