@@ -109,6 +109,12 @@ service cloud.firestore {
       // Delete allowed only by requester for pending requests
       allow delete: if request.auth != null && request.auth.uid == resource.data.requesterId && resource.data.status == 'pending';
     }
+
+    // --- GOOGLE CALENDAR TOKENS ---
+    match /userCalendarTokens/{userId} {
+      // Users can only read/write their own calendar tokens
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
   }
 }
 

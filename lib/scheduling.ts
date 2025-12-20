@@ -93,7 +93,9 @@ export async function createScheduleRequest(
 export async function confirmScheduleRequest(
   requestId: string,
   confirmedTime: Timestamp,
-  meetingLink?: string
+  meetingLink?: string,
+  createCalendarEvent?: boolean,
+  userId?: string
 ) {
   const requestRef = doc(db, 'scheduleRequests', requestId);
   const requestDoc = await getDoc(requestRef);
@@ -101,13 +103,54 @@ export async function confirmScheduleRequest(
   
   if (!requestData) throw new Error('Schedule request not found');
   
+  let finalMeetingLink = meetingLink;
+  
+  // Create Google Calendar event if requested and user has connected calendar
+  if (createCalendarEvent && userId) {
+    try {
+      // Get other participant's email
+      const otherUserId = requestData.requesterId === userId 
+        ? requestData.receiverId 
+        : requestData.requesterId;
+      const otherUserDoc = await getDoc(doc(db, 'users', otherUserId));
+      const otherUserEmail = otherUserDoc.exists() ? otherUserDoc.data()?.email : null;
+      
+      // Calculate end time (default 1 hour meeting)
+      const startTime = confirmedTime.toDate();
+      const endTime = new Date(startTime.getTime() + 60 * 60 * 1000); // 1 hour later
+      
+      const calendarResponse = await fetch('/api/calendar/create-event', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId,
+          title: `Video Call: ${requestData.requesterName} & ${requestData.receiverName}`,
+          description: `Scheduled video call between ${requestData.requesterName} and ${requestData.receiverName}`,
+          startTime: startTime.toISOString(),
+          endTime: endTime.toISOString(),
+          attendees: otherUserEmail ? [otherUserEmail] : [],
+        }),
+      });
+      
+      if (calendarResponse.ok) {
+        const calendarData = await calendarResponse.json();
+        if (calendarData.meetLink) {
+          finalMeetingLink = calendarData.meetLink;
+        }
+      }
+    } catch (error) {
+      console.error('Failed to create calendar event:', error);
+      // Continue without calendar event if it fails
+    }
+  }
+  
   const updateData: any = {
     status: 'confirmed',
     confirmedTime,
   };
   
-  if (meetingLink) {
-    updateData.meetingLink = meetingLink;
+  if (finalMeetingLink) {
+    updateData.meetingLink = finalMeetingLink;
   }
   
   await updateDoc(requestRef, updateData);

@@ -48,6 +48,7 @@
     "firebase": "^12.0.0",
     "framer-motion": "^12.23.12",
     "fuse.js": "^7.1.0",
+    "googleapis": "^169.0.0",
     "input-otp": "1.4.1",
     "lucide-react": "^0.454.0",
     "mongodb": "^6.18.0",

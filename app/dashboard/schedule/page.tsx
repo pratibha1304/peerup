@@ -3,6 +3,7 @@
 import { useEffect, useState, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
+import { hasCalendarConnection } from '@/lib/google-calendar';
 import {
   createScheduleRequest,
   confirmScheduleRequest,
@@ -100,6 +101,13 @@ function ScheduleContent() {
   const [selectedRequestId, setSelectedRequestId] = useState<string | null>(null);
   const [selectedTime, setSelectedTime] = useState<Timestamp | null>(null);
   const [meetingLink, setMeetingLink] = useState("");
+  const [calendarConnected, setCalendarConnected] = useState(false);
+
+  useEffect(() => {
+    if (user) {
+      hasCalendarConnection(user.uid).then(setCalendarConnected);
+    }
+  }, [user]);
 
   const handleConfirm = async (requestId: string, time: Timestamp) => {
     setSelectedRequestId(requestId);
@@ -109,18 +117,20 @@ function ScheduleContent() {
   };
 
   const handleConfirmWithLink = async () => {
-    if (!selectedRequestId || !selectedTime) return;
+    if (!selectedRequestId || !selectedTime || !user) return;
     
     setLoading(true);
     try {
-      // Generate Google Meet link if not provided
+      // Check if user wants to create calendar event
+      const createCalendarEvent = meetingLink.trim() === ''; // Auto-create if no link provided
+      
+      // Generate Google Meet link if not provided and calendar not connected
       let finalMeetingLink = meetingLink.trim();
       
-      if (!finalMeetingLink) {
+      if (!finalMeetingLink && !createCalendarEvent) {
         // Create a simple Google Meet link (user will need to create the meeting)
-        // Alternative: Use Google Calendar API to create event with Meet link
         finalMeetingLink = `https://meet.google.com/new?hs=122&authuser=0`;
-      } else if (!finalMeetingLink.startsWith("http")) {
+      } else if (finalMeetingLink && !finalMeetingLink.startsWith("http")) {
         // If it's just a meeting code, format it as a full URL
         if (finalMeetingLink.includes("meet.google.com")) {
           finalMeetingLink = `https://${finalMeetingLink}`;
@@ -129,7 +139,15 @@ function ScheduleContent() {
         }
       }
       
-      await confirmScheduleRequest(selectedRequestId, selectedTime, finalMeetingLink);
+      // Confirm schedule (will create calendar event if createCalendarEvent is true)
+      await confirmScheduleRequest(
+        selectedRequestId, 
+        selectedTime, 
+        finalMeetingLink || undefined,
+        createCalendarEvent,
+        user.uid
+      );
+      
       setShowMeetingLinkModal(false);
       setSelectedRequestId(null);
       setSelectedTime(null);
@@ -383,23 +401,45 @@ function ScheduleContent() {
             <h3 className="text-2xl font-bold mb-4">Confirm Schedule</h3>
             
             <div className="mb-6">
-              <p className="text-gray-600 mb-4">
-                Add a meeting link (Google Meet, Zoom, etc.) or leave blank to generate a Google Meet link.
-              </p>
-              
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Meeting Link (optional)
-              </label>
-              <input
-                type="text"
-                value={meetingLink}
-                onChange={(e) => setMeetingLink(e.target.value)}
-                placeholder="https://meet.google.com/xxx-xxxx-xxx or leave blank"
-                className="w-full border border-gray-200 rounded-xl px-3 py-2 mb-2"
-              />
-              <p className="text-xs text-gray-500">
-                Tip: Leave blank to get a Google Meet link, or paste your Zoom/Teams link
-              </p>
+              {calendarConnected ? (
+                <>
+                  <p className="text-gray-600 mb-4">
+                    Your Google Calendar is connected! Leave the meeting link blank to automatically create a calendar event with a Google Meet link.
+                  </p>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Meeting Link (optional)
+                  </label>
+                  <input
+                    type="text"
+                    value={meetingLink}
+                    onChange={(e) => setMeetingLink(e.target.value)}
+                    placeholder="Leave blank for auto-created Meet link, or paste your own link"
+                    className="w-full border border-gray-200 rounded-xl px-3 py-2 mb-2"
+                  />
+                  <p className="text-xs text-green-600">
+                    ✓ Calendar connected - event will be created automatically if left blank
+                  </p>
+                </>
+              ) : (
+                <>
+                  <p className="text-gray-600 mb-4">
+                    Add a meeting link (Google Meet, Zoom, etc.) or leave blank to generate a basic Google Meet link.
+                  </p>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Meeting Link (optional)
+                  </label>
+                  <input
+                    type="text"
+                    value={meetingLink}
+                    onChange={(e) => setMeetingLink(e.target.value)}
+                    placeholder="https://meet.google.com/xxx-xxxx-xxx or leave blank"
+                    className="w-full border border-gray-200 rounded-xl px-3 py-2 mb-2"
+                  />
+                  <p className="text-xs text-gray-500">
+                    Tip: Connect Google Calendar in Settings to auto-create events with Meet links
+                  </p>
+                </>
+              )}
             </div>
 
             <div className="flex gap-3">

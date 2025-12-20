@@ -1,236 +1,166 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useAuth } from "@/lib/auth-context";
-import { Switch } from "@/components/ui/switch";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-
-type Visibility = "community" | "matches-only";
-
-const defaultTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
-
-const DEFAULT_SETTINGS = {
-  emailUpdates: true,
-  matchAlerts: true,
-  callReminders: true,
-  digestFrequency: "weekly",
-  profileVisibility: "community" as Visibility,
-  timezone: defaultTimezone,
-};
-
-type SettingsState = typeof DEFAULT_SETTINGS;
+import { useEffect, useState } from 'react';
+import { useAuth } from '@/lib/auth-context';
+import { hasCalendarConnection, deleteCalendarTokens } from '@/lib/google-calendar';
+import { Calendar, CheckCircle2, X, ExternalLink } from 'lucide-react';
 
 export default function SettingsPage() {
-  const { user, loading, updateProfile } = useAuth();
-  const [displayName, setDisplayName] = useState("");
-  const [settings, setSettings] = useState<SettingsState>(DEFAULT_SETTINGS);
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState("");
-  const [message, setMessage] = useState("");
-  const digestOptions: SettingsState['digestFrequency'][] = ['daily', 'weekly', 'off'];
+  const { user } = useAuth();
+  const [calendarConnected, setCalendarConnected] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [disconnecting, setDisconnecting] = useState(false);
 
   useEffect(() => {
-    if (!user) return;
-    setDisplayName(user.name || "");
-    const merged = { ...DEFAULT_SETTINGS, ...(user.settings || {}) };
-    setSettings(merged);
+    if (user) {
+      checkCalendarConnection();
+    }
   }, [user]);
 
-  const handleToggle = <K extends keyof SettingsState>(key: K) => (value: SettingsState[K]) => {
-    setSettings((prev) => ({ ...prev, [key]: value }));
-  };
-
-  const handleSave = async () => {
+  const checkCalendarConnection = async () => {
     if (!user) return;
-    setSaving(true);
-    setError("");
-    setMessage("");
     try {
-      const updates = {
-        name: displayName.trim() || user.name,
-        settings,
-      };
-
-      await updateProfile(updates);
-      setMessage("Settings updated");
-    } catch (err: any) {
-      setError(err.message || "Failed to save settings");
+      const connected = await hasCalendarConnection(user.uid);
+      setCalendarConnected(connected);
+    } catch (error) {
+      console.error('Error checking calendar connection:', error);
     } finally {
-      setSaving(false);
+      setLoading(false);
     }
   };
 
-  const handleDeleteAccount = () => {
-    alert("We're happy you're here! If you really need to delete your account, reach out to support and we'll take care of it.");
+  const handleConnectCalendar = () => {
+    if (!user) return;
+    
+    const clientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
+    if (!clientId) {
+      alert('Google Calendar integration is not configured. Please contact support.');
+      return;
+    }
+
+    const redirectUri = `${process.env.NEXT_PUBLIC_APP_URL || window.location.origin}/api/auth/google/callback`;
+    const scope = 'https://www.googleapis.com/auth/calendar https://www.googleapis.com/auth/calendar.events';
+    const responseType = 'code';
+    const accessType = 'offline'; // Required to get refresh token
+    const prompt = 'consent'; // Force consent screen to get refresh token
+    
+    // Pass userId in state parameter
+    const state = user.uid;
+    
+    const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?` +
+      `client_id=${encodeURIComponent(clientId)}&` +
+      `redirect_uri=${encodeURIComponent(redirectUri)}&` +
+      `response_type=${responseType}&` +
+      `scope=${encodeURIComponent(scope)}&` +
+      `access_type=${accessType}&` +
+      `prompt=${prompt}&` +
+      `state=${encodeURIComponent(state)}`;
+
+    window.location.href = authUrl;
   };
+
+  const handleDisconnectCalendar = async () => {
+    if (!user) return;
+    
+    const confirmed = window.confirm(
+      'Are you sure you want to disconnect Google Calendar? You will need to reconnect to automatically create calendar events.'
+    );
+    
+    if (!confirmed) return;
+
+    setDisconnecting(true);
+    try {
+      await deleteCalendarTokens(user.uid);
+      setCalendarConnected(false);
+      alert('Google Calendar disconnected successfully.');
+    } catch (error) {
+      console.error('Error disconnecting calendar:', error);
+      alert('Failed to disconnect calendar. Please try again.');
+    } finally {
+      setDisconnecting(false);
+    }
+  };
+
+  // Check for OAuth callback parameters
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const error = params.get('error');
+    const success = params.get('calendar_connected');
+    
+    if (error) {
+      alert(`Calendar connection error: ${error}`);
+      // Clean URL
+      window.history.replaceState({}, '', '/dashboard/settings');
+    }
+    
+    if (success === 'true') {
+      setCalendarConnected(true);
+      alert('Google Calendar connected successfully!');
+      // Clean URL
+      window.history.replaceState({}, '', '/dashboard/settings');
+    }
+  }, []);
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-[60vh]">
-        <div className="text-muted-foreground">Loading your settings...</div>
-      </div>
-    );
-  }
-
-  if (!user) {
-    return (
-      <div className="flex items-center justify-center min-h-[60vh] text-center">
-        <div>
-          <h2 className="text-2xl font-semibold mb-2">You need to sign in</h2>
-          <p className="text-muted-foreground">Log back in to customize your experience.</p>
-        </div>
+      <div className="max-w-4xl mx-auto p-6">
+        <div className="text-center py-12">Loading settings...</div>
       </div>
     );
   }
 
   return (
-    <div className="max-w-3xl mx-auto py-10 space-y-8">
-      <div>
-        <h1 className="text-3xl font-bold mb-2 text-[#2C6485]">Settings</h1>
-        <p className="text-gray-600">Tweak, toggle, personalize. (We love a good settings page.)</p>
-      </div>
+    <div className="max-w-4xl mx-auto p-6">
+      <h1 className="text-3xl font-bold mb-6">Settings</h1>
 
-      {error && (
-        <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
-          {error}
-        </div>
-      )}
-      {message && (
-        <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-700">
-          {message}
-        </div>
-      )}
-
-      <section className="bg-white rounded-2xl border p-6 space-y-4">
-        <h2 className="text-xl font-semibold">Profile</h2>
-        <div className="grid gap-4 md:grid-cols-2">
-          <div>
-            <label className="block text-sm font-medium mb-2">Display name</label>
-            <Input value={displayName} onChange={(e) => setDisplayName(e.target.value)} placeholder="How your matches see you" />
-          </div>
-          <div>
-            <label className="block text-sm font-medium mb-2">Email</label>
-            <Input value={user.email} disabled className="bg-gray-100 dark:bg-gray-800" />
+      <div className="bg-white rounded-2xl border p-6 shadow-sm">
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-3">
+            <Calendar className="w-6 h-6 text-indigo-500" />
+            <div>
+              <h2 className="text-xl font-semibold">Google Calendar Integration</h2>
+              <p className="text-sm text-gray-600">
+                Connect your Google Calendar to automatically create events with Meet links when scheduling calls
+              </p>
+            </div>
           </div>
         </div>
-        <div>
-          <label className="block text-sm font-medium mb-2">Timezone</label>
-          <Input
-            value={settings.timezone}
-            onChange={(e) => handleToggle("timezone")(e.target.value)}
-            placeholder="e.g., America/New_York"
-          />
-          <p className="text-xs text-muted-foreground mt-1">We use this for reminders and scheduling suggestions.</p>
-        </div>
-      </section>
 
-      <section className="bg-white rounded-2xl border p-6 space-y-4">
-        <h2 className="text-xl font-semibold">Notifications</h2>
-        <SettingToggle
-          label="Email updates"
-          description="Weekly summaries, match nudges, and important news."
-          checked={settings.emailUpdates}
-          onCheckedChange={(value) => handleToggle("emailUpdates")(value)}
-        />
-        <SettingToggle
-          label="Match alerts"
-          description="Get notified when a mentor or mentee responds."
-          checked={settings.matchAlerts}
-          onCheckedChange={(value) => handleToggle("matchAlerts")(value)}
-        />
-        <SettingToggle
-          label="Call reminders"
-          description="15-minute reminders before scheduled sessions."
-          checked={settings.callReminders}
-          onCheckedChange={(value) => handleToggle("callReminders")(value)}
-        />
-        <div className="pt-2">
-          <label className="block text-sm font-medium mb-1">Goal digest frequency</label>
-          <div className="flex gap-3">
-            {digestOptions.map((option) => (
+        {calendarConnected ? (
+          <div className="mt-4 p-4 bg-green-50 rounded-lg border border-green-200">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <CheckCircle2 className="w-5 h-5 text-green-600" />
+                <span className="text-green-800 font-medium">Calendar Connected</span>
+              </div>
               <button
-                key={option}
-                type="button"
-                onClick={() => handleToggle("digestFrequency")(option)}
-                className={`px-3 py-1 rounded-full text-sm border ${
-                  settings.digestFrequency === option ? "bg-[#645990] text-white border-[#645990]" : "border-gray-300 hover:bg-gray-50"
-                }`}
+                onClick={handleDisconnectCalendar}
+                disabled={disconnecting}
+                className="px-4 py-2 text-sm bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors disabled:opacity-50 flex items-center gap-2"
               >
-                {option.charAt(0).toUpperCase() + option.slice(1)}
+                <X className="w-4 h-4" />
+                {disconnecting ? 'Disconnecting...' : 'Disconnect'}
               </button>
-            ))}
+            </div>
+            <p className="text-sm text-green-700 mt-2">
+              Your calendar is connected. Events will be automatically created when you confirm scheduled calls.
+            </p>
           </div>
-        </div>
-      </section>
-
-      <section className="bg-white rounded-2xl border p-6 space-y-4">
-        <h2 className="text-xl font-semibold">Privacy</h2>
-        <div className="flex flex-col gap-2">
-          <label className="text-sm font-medium">Profile visibility</label>
-          <div className="flex gap-2">
+        ) : (
+          <div className="mt-4">
             <button
-              type="button"
-              onClick={() => handleToggle("profileVisibility")("community")}
-              className={`px-3 py-2 rounded-lg border text-sm ${
-                settings.profileVisibility === "community" ? "border-[#85BCB1] bg-[#85BCB1]/10 text-[#2C6485]" : "border-gray-300"
-              }`}
+              onClick={handleConnectCalendar}
+              className="px-6 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors flex items-center gap-2"
             >
-              Community
+              <ExternalLink className="w-5 h-5" />
+              Connect Google Calendar
             </button>
-            <button
-              type="button"
-              onClick={() => handleToggle("profileVisibility")("matches-only")}
-              className={`px-3 py-2 rounded-lg border text-sm ${
-                settings.profileVisibility === "matches-only" ? "border-[#85BCB1] bg-[#85BCB1]/10 text-[#2C6485]" : "border-gray-300"
-              }`}
-            >
-              Matches only
-            </button>
+            <p className="text-sm text-gray-600 mt-2">
+              You'll be redirected to Google to authorize calendar access. This allows PeerUp to create calendar events automatically.
+            </p>
           </div>
-          <p className="text-xs text-muted-foreground">
-            Choose whether the community can discover you, or limit visibility to people you already match with.
-          </p>
-        </div>
-      </section>
-
-      <section className="bg-white rounded-2xl border p-6 space-y-4">
-        <h2 className="text-xl font-semibold">Danger zone</h2>
-        <p className="text-sm text-muted-foreground">
-          Need a reset? You can pause notifications or delete your account entirely.
-        </p>
-        <Button variant="destructive" onClick={handleDeleteAccount}>
-          Delete account
-        </Button>
-      </section>
-
-      <div className="flex justify-end">
-        <Button onClick={handleSave} disabled={saving}>
-          {saving ? "Saving..." : "Save settings"}
-        </Button>
+        )}
       </div>
-    </div>
-  );
-}
-
-function SettingToggle({
-  label,
-  description,
-  checked,
-  onCheckedChange,
-}: {
-  label: string;
-  description: string;
-  checked: boolean;
-  onCheckedChange: (value: boolean) => void;
-}) {
-  return (
-    <div className="flex items-center justify-between gap-4 border rounded-2xl px-4 py-3">
-      <div>
-        <p className="font-medium">{label}</p>
-        <p className="text-sm text-muted-foreground">{description}</p>
-      </div>
-      <Switch checked={checked} onCheckedChange={onCheckedChange} />
     </div>
   );
 }
