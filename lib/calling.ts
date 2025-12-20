@@ -335,7 +335,22 @@ export function listenForIceCandidates(
 }
 
 export async function createOffer(peerConnection: RTCPeerConnection): Promise<RTCSessionDescriptionInit> {
-  const offer = await peerConnection.createOffer();
+  // Ensure all transceivers are configured before creating offer
+  peerConnection.getTransceivers().forEach((transceiver) => {
+    if (transceiver.sender.track?.kind === 'audio') {
+      // Force audio transceiver to sendrecv
+      if (transceiver.direction === 'inactive' || transceiver.direction === 'recvonly') {
+        transceiver.direction = 'sendrecv';
+        console.log('✅ Fixed audio transceiver direction to sendrecv in offer');
+      }
+    }
+  });
+  
+  const offer = await peerConnection.createOffer({
+    offerToReceiveAudio: true,
+    offerToReceiveVideo: false, // Will be set based on call type
+  });
+  
   await peerConnection.setLocalDescription(offer);
   return offer;
 }
@@ -345,7 +360,23 @@ export async function createAnswer(
   offer: any
 ): Promise<RTCSessionDescriptionInit> {
   await peerConnection.setRemoteDescription(new RTCSessionDescription(offer));
-  const answer = await peerConnection.createAnswer();
+  
+  // Ensure all transceivers are configured before creating answer
+  peerConnection.getTransceivers().forEach((transceiver) => {
+    if (transceiver.sender.track?.kind === 'audio') {
+      // Force audio transceiver to sendrecv
+      if (transceiver.direction === 'inactive' || transceiver.direction === 'recvonly') {
+        transceiver.direction = 'sendrecv';
+        console.log('✅ Fixed audio transceiver direction to sendrecv in answer');
+      }
+    }
+  });
+  
+  const answer = await peerConnection.createAnswer({
+    offerToReceiveAudio: true,
+    offerToReceiveVideo: false, // Will be set based on call type
+  });
+  
   await peerConnection.setLocalDescription(answer);
   return answer;
 }
