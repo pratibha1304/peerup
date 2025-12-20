@@ -22,6 +22,7 @@ export type ScheduleRequest = {
   proposedTimes: Timestamp[];
   status: 'pending' | 'confirmed' | 'declined';
   confirmedTime?: Timestamp;
+  meetingLink?: string;
   createdAt: Timestamp;
 };
 
@@ -91,7 +92,8 @@ export async function createScheduleRequest(
 
 export async function confirmScheduleRequest(
   requestId: string,
-  confirmedTime: Timestamp
+  confirmedTime: Timestamp,
+  meetingLink?: string
 ) {
   const requestRef = doc(db, 'scheduleRequests', requestId);
   const requestDoc = await getDoc(requestRef);
@@ -99,10 +101,16 @@ export async function confirmScheduleRequest(
   
   if (!requestData) throw new Error('Schedule request not found');
   
-  await updateDoc(requestRef, {
+  const updateData: any = {
     status: 'confirmed',
     confirmedTime,
-  });
+  };
+  
+  if (meetingLink) {
+    updateData.meetingLink = meetingLink;
+  }
+  
+  await updateDoc(requestRef, updateData);
 
   // Send email notification to requester
   try {

@@ -13,7 +13,7 @@ import {
   type ScheduleRequest,
 } from '@/lib/scheduling';
 import { Timestamp } from 'firebase/firestore';
-import { Calendar, Clock, X, User, CheckCircle2 } from 'lucide-react';
+import { Calendar, Clock, X, User, CheckCircle2, Video, ExternalLink } from 'lucide-react';
 
 // ----------------------------------------------------------------------
 // 1. The Main Logic Component (Renamed from SchedulePage to ScheduleContent)
@@ -96,10 +96,44 @@ function ScheduleContent() {
     }
   };
 
+  const [showMeetingLinkModal, setShowMeetingLinkModal] = useState(false);
+  const [selectedRequestId, setSelectedRequestId] = useState<string | null>(null);
+  const [selectedTime, setSelectedTime] = useState<Timestamp | null>(null);
+  const [meetingLink, setMeetingLink] = useState("");
+
   const handleConfirm = async (requestId: string, time: Timestamp) => {
+    setSelectedRequestId(requestId);
+    setSelectedTime(time);
+    setMeetingLink("");
+    setShowMeetingLinkModal(true);
+  };
+
+  const handleConfirmWithLink = async () => {
+    if (!selectedRequestId || !selectedTime) return;
+    
     setLoading(true);
     try {
-      await confirmScheduleRequest(requestId, time);
+      // Generate Google Meet link if not provided
+      let finalMeetingLink = meetingLink.trim();
+      
+      if (!finalMeetingLink) {
+        // Create a simple Google Meet link (user will need to create the meeting)
+        // Alternative: Use Google Calendar API to create event with Meet link
+        finalMeetingLink = `https://meet.google.com/new?hs=122&authuser=0`;
+      } else if (!finalMeetingLink.startsWith("http")) {
+        // If it's just a meeting code, format it as a full URL
+        if (finalMeetingLink.includes("meet.google.com")) {
+          finalMeetingLink = `https://${finalMeetingLink}`;
+        } else {
+          finalMeetingLink = `https://meet.google.com/${finalMeetingLink}`;
+        }
+      }
+      
+      await confirmScheduleRequest(selectedRequestId, selectedTime, finalMeetingLink);
+      setShowMeetingLinkModal(false);
+      setSelectedRequestId(null);
+      setSelectedTime(null);
+      setMeetingLink("");
     } catch (error) {
       console.error('Error confirming schedule:', error);
       alert('Failed to confirm schedule');
@@ -267,6 +301,18 @@ function ScheduleContent() {
                     <p className="text-gray-600">
                       {schedule.confirmedTime && formatTimestamp(schedule.confirmedTime)}
                     </p>
+                    {schedule.meetingLink && (
+                      <a
+                        href={schedule.meetingLink}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="mt-2 inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm"
+                      >
+                        <Video className="w-4 h-4" />
+                        Join Meeting
+                        <ExternalLink className="w-3 h-3" />
+                      </a>
+                    )}
                   </div>
                 </div>
               </div>
@@ -310,11 +356,73 @@ function ScheduleContent() {
                         Confirmed for: {formatTimestamp(request.confirmedTime)}
                       </p>
                     )}
+                    {request.meetingLink && (
+                      <a
+                        href={request.meetingLink}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="mt-2 inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm"
+                      >
+                        <Video className="w-4 h-4" />
+                        Join Meeting
+                        <ExternalLink className="w-3 h-3" />
+                      </a>
+                    )}
                   </div>
                 </div>
               </div>
             ))
           )}
+        </div>
+      )}
+
+      {/* Meeting Link Modal */}
+      {showMeetingLinkModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl p-8 max-w-lg w-full">
+            <h3 className="text-2xl font-bold mb-4">Confirm Schedule</h3>
+            
+            <div className="mb-6">
+              <p className="text-gray-600 mb-4">
+                Add a meeting link (Google Meet, Zoom, etc.) or leave blank to generate a Google Meet link.
+              </p>
+              
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Meeting Link (optional)
+              </label>
+              <input
+                type="text"
+                value={meetingLink}
+                onChange={(e) => setMeetingLink(e.target.value)}
+                placeholder="https://meet.google.com/xxx-xxxx-xxx or leave blank"
+                className="w-full border border-gray-200 rounded-xl px-3 py-2 mb-2"
+              />
+              <p className="text-xs text-gray-500">
+                Tip: Leave blank to get a Google Meet link, or paste your Zoom/Teams link
+              </p>
+            </div>
+
+            <div className="flex gap-3">
+              <button
+                onClick={() => {
+                  setShowMeetingLinkModal(false);
+                  setSelectedRequestId(null);
+                  setSelectedTime(null);
+                  setMeetingLink("");
+                }}
+                className="flex-1 px-4 py-2 border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleConfirmWithLink}
+                disabled={loading}
+                className="flex-1 px-4 py-2 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 transition-colors disabled:opacity-50"
+              >
+                {loading ? 'Confirming...' : 'Confirm Schedule'}
+              </button>
+            </div>
+          </div>
         </div>
       )}
 

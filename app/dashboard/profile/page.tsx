@@ -1,11 +1,13 @@
 "use client";
 import { useEffect, useState, useRef } from "react";
-import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
-import { User, Camera, Save, RefreshCw, AlertCircle, CheckCircle } from "lucide-react";
+import { ref, uploadBytes, getDownloadURL, deleteObject } from "firebase/storage";
+import { User, Camera, Save, RefreshCw, AlertCircle, CheckCircle, X, Crop } from "lucide-react";
 import { MultiCombobox } from "@/components/ui/multi-combobox";
 import { PROFILE_TAGS } from "@/lib/profile-options";
 import { useAuth } from "@/lib/auth-context";
 import { storage } from "@/lib/firebase";
+import Cropper from "react-easy-crop";
+import { Area } from "react-easy-crop/types";
 
 const ROLES = [
   { value: "mentor", label: "Mentor", desc: "Guide others, share your expertise" },
@@ -39,6 +41,11 @@ export default function ProfilePage() {
   const [profilePic, setProfilePic] = useState<File | null>(null);
   const [profilePicUrl, setProfilePicUrl] = useState("");
   const [resumeUrl, setResumeUrl] = useState("");
+  const [showCropModal, setShowCropModal] = useState(false);
+  const [cropImage, setCropImage] = useState("");
+  const [crop, setCrop] = useState({ x: 0, y: 0 });
+  const [zoom, setZoom] = useState(1);
+  const [croppedAreaPixels, setCroppedAreaPixels] = useState<Area | null>(null);
   const { user, loading: authLoading, updateProfile } = useAuth();
 
   useEffect(() => {
@@ -68,7 +75,114 @@ export default function ProfilePage() {
     if (file) {
       setProfilePic(file);
       const previewUrl = URL.createObjectURL(file);
-      setProfilePicUrl(previewUrl);
+      setCropImage(previewUrl);
+      setShowCropModal(true);
+    }
+  };
+
+  const createImage = (url: string): Promise<HTMLImageElement> => {
+    return new Promise((resolve, reject) => {
+      const image = new Image();
+      image.addEventListener("load", () => resolve(image));
+      image.addEventListener("error", (error) => reject(error));
+      image.src = url;
+    });
+  };
+
+  const getCroppedImg = async (imageSrc: string, pixelCrop: Area): Promise<Blob> => {
+    const image = await createImage(imageSrc);
+    const canvas = document.createElement("canvas");
+    const ctx = canvas.getContext("2d");
+
+    if (!ctx) {
+      throw new Error("No 2d context");
+    }
+
+    const maxSize = Math.max(image.width, image.height);
+    const safeArea = 2 * ((maxSize / 2) * Math.sqrt(2));
+
+    canvas.width = safeArea;
+    canvas.height = safeArea;
+
+    ctx.translate(safeArea / 2, safeArea / 2);
+    ctx.translate(-safeArea / 2, -safeArea / 2);
+
+    ctx.drawImage(
+      image,
+      safeArea / 2 - image.width * 0.5,
+      safeArea / 2 - image.height * 0.5
+    );
+
+    const data = ctx.getImageData(0, 0, safeArea, safeArea);
+
+    canvas.width = pixelCrop.width;
+    canvas.height = pixelCrop.height;
+
+    ctx.putImageData(
+      data,
+      Math.round(0 - safeArea / 2 + image.width * 0.5 - pixelCrop.x),
+      Math.round(0 - safeArea / 2 + image.height * 0.5 - pixelCrop.y)
+    );
+
+    return new Promise((resolve) => {
+      canvas.toBlob((blob) => {
+        if (blob) {
+          resolve(blob);
+        }
+      }, "image/jpeg", 0.95);
+    });
+  };
+
+  const handleCropComplete = async () => {
+    if (!croppedAreaPixels || !cropImage) return;
+
+    try {
+      const croppedBlob = await getCroppedImg(cropImage, croppedAreaPixels);
+      const croppedUrl = URL.createObjectURL(croppedBlob);
+      setProfilePicUrl(croppedUrl);
+      
+      // Convert blob to File
+      const file = new File([croppedBlob], "profile-pic.jpg", { type: "image/jpeg" });
+      setProfilePic(file);
+      
+      setShowCropModal(false);
+      // Clean up
+      if (cropImage.startsWith("blob:")) {
+        URL.revokeObjectURL(cropImage);
+      }
+    } catch (error) {
+      console.error("Error cropping image:", error);
+      setError("Failed to crop image. Please try again.");
+    }
+  };
+
+  const handleDeleteProfilePic = async () => {
+    if (!user?.profilePicUrl) return;
+    
+    const confirmed = window.confirm("Are you sure you want to delete your profile picture?");
+    if (!confirmed) return;
+
+    try {
+      // Delete from Firebase Storage if it's a Firebase URL
+      if (user.profilePicUrl.includes("firebase")) {
+        try {
+          const imageRef = ref(storage, user.profilePicUrl);
+          await deleteObject(imageRef);
+        } catch (deleteError) {
+          console.warn("Could not delete from storage:", deleteError);
+          // Continue even if storage delete fails
+        }
+      }
+
+      // Update profile to remove picture
+      await updateProfile({ profilePicUrl: "" });
+      setProfilePicUrl("");
+      setProfilePic(null);
+      setSuccess(true);
+      setTimeout(() => setSuccess(false), 3000);
+    } catch (error: any) {
+      console.error("Error deleting profile picture:", error);
+      setError("Failed to delete profile picture. Please try again.");
     }
   };
 
@@ -254,14 +368,31 @@ export default function ProfilePage() {
             <h2 className="text-xl font-semibold mb-4 text-[#2C6485] dark:text-[#85BCB1]">Profile Picture</h2>
             <div className="flex flex-col items-center">
               <div className="relative mb-4">
-                <img
-                  src={profilePicUrl || "/placeholder-user.jpg"}
-                  alt="Profile"
-                  className="w-32 h-32 rounded-full object-cover border-4 border-[#85BCB1]"
-                />
+                <div
+                  className="w-32 h-32 rounded-full overflow-hidden border-4 border-[#85BCB1] cursor-pointer relative group"
+                  onClick={() => fileInputRef.current?.click()}
+                  onContextMenu={(e) => {
+                    e.preventDefault();
+                    return false;
+                  }}
+                  style={{ pointerEvents: "auto" }}
+                >
+                  <img
+                    src={profilePicUrl || "/placeholder-user.jpg"}
+                    alt="Profile"
+                    className="w-full h-full object-cover"
+                    draggable={false}
+                    onDragStart={(e) => e.preventDefault()}
+                    style={{ userSelect: "none", pointerEvents: "none" }}
+                  />
+                  <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-30 transition-opacity flex items-center justify-center">
+                    <Camera className="w-6 h-6 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
+                  </div>
+                </div>
                 <button
                   onClick={() => fileInputRef.current?.click()}
-                  className="absolute bottom-0 right-0 bg-[#85BCB1] text-white p-2 rounded-full hover:bg-[#645990] transition"
+                  className="absolute bottom-0 right-0 bg-[#85BCB1] text-white p-2 rounded-full hover:bg-[#645990] transition shadow-lg z-10"
+                  title="Upload new picture"
                 >
                   <Camera className="w-4 h-4" />
                 </button>
@@ -273,8 +404,35 @@ export default function ProfilePage() {
                 onChange={handleFileChange}
                 className="hidden"
               />
-              <p className="text-sm text-gray-500 text-center">
-                Click the camera icon to upload a new picture
+              <div className="flex gap-2 mt-2">
+                {profilePicUrl && (
+                  <>
+                    <button
+                      onClick={() => {
+                        if (profilePic) {
+                          setCropImage(profilePicUrl);
+                          setShowCropModal(true);
+                        }
+                      }}
+                      className="px-3 py-1 text-xs bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition flex items-center gap-1"
+                      title="Crop image"
+                    >
+                      <Crop className="w-3 h-3" />
+                      Crop
+                    </button>
+                    <button
+                      onClick={handleDeleteProfilePic}
+                      className="px-3 py-1 text-xs bg-red-500 text-white rounded-lg hover:bg-red-600 transition flex items-center gap-1"
+                      title="Delete picture"
+                    >
+                      <X className="w-3 h-3" />
+                      Delete
+                    </button>
+                  </>
+                )}
+              </div>
+              <p className="text-sm text-gray-500 text-center mt-2">
+                Click the image or camera icon to upload
               </p>
               <div className="w-full mt-6">
                 <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Snapshot</h3>
@@ -464,6 +622,60 @@ export default function ProfilePage() {
           </div>
         </div>
       </div>
+
+      {/* Crop Modal */}
+      {showCropModal && cropImage && (
+        <div className="fixed inset-0 bg-black bg-opacity-75 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl p-6 max-w-2xl w-full max-h-[90vh] overflow-auto">
+            <h3 className="text-xl font-semibold mb-4">Crop Your Profile Picture</h3>
+            <div className="relative w-full h-96 bg-gray-900 rounded-lg mb-4">
+              <Cropper
+                image={cropImage}
+                crop={crop}
+                zoom={zoom}
+                aspect={1}
+                onCropChange={setCrop}
+                onZoomChange={setZoom}
+                onCropComplete={(croppedArea, croppedAreaPixels) => {
+                  setCroppedAreaPixels(croppedAreaPixels);
+                }}
+                cropShape="round"
+              />
+            </div>
+            <div className="mb-4">
+              <label className="block text-sm font-medium mb-2">Zoom</label>
+              <input
+                type="range"
+                min={1}
+                max={3}
+                step={0.1}
+                value={zoom}
+                onChange={(e) => setZoom(Number(e.target.value))}
+                className="w-full"
+              />
+            </div>
+            <div className="flex gap-3">
+              <button
+                onClick={() => {
+                  setShowCropModal(false);
+                  if (cropImage.startsWith("blob:")) {
+                    URL.revokeObjectURL(cropImage);
+                  }
+                }}
+                className="flex-1 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleCropComplete}
+                className="flex-1 px-4 py-2 bg-[#85BCB1] text-white rounded-lg hover:bg-[#645990] transition"
+              >
+                Apply Crop
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

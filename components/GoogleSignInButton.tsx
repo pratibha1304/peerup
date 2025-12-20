@@ -2,6 +2,7 @@
 import React, { useState } from "react";
 import { useRouter } from "next/navigation";
 import { auth, db, GoogleAuthProvider } from "@/lib/firebase";
+import { signOut } from "firebase/auth";
 import { signInWithPopup } from "firebase/auth";
 import { doc, getDoc } from "firebase/firestore";
 import { Button } from "@/components/ui/button";
@@ -24,14 +25,27 @@ export default function GoogleSignInButton() {
       const userSnap = await getDoc(userRef);
       
       if (!userSnap.exists()) {
-        // No Firestore profile yet - redirect to onboarding with pre-filled data
-        const params = new URLSearchParams({
-          step: '2',
-          name: user.displayName || '',
-          email: user.email || '',
-          profilePicUrl: user.photoURL || ''
-        });
-        router.push(`/auth/signup?${params.toString()}`);
+        // Show popup message that email is not registered
+        const userConfirmed = window.confirm(
+          `This email (${user.email}) is not registered with PeerUp.\n\n` +
+          `Would you like to create an account? You'll be redirected to complete your profile.`
+        );
+        
+        if (userConfirmed) {
+          // No Firestore profile yet - redirect to onboarding with pre-filled data
+          const params = new URLSearchParams({
+            step: '2',
+            name: user.displayName || '',
+            email: user.email || '',
+            profilePicUrl: user.photoURL || ''
+          });
+          router.push(`/auth/signup?${params.toString()}`);
+        } else {
+          // User cancelled, sign them out
+          await signOut(auth);
+          setError("Please sign up first or use a registered email address.");
+        }
+        return;
       } else {
         // Check if user has completed their profile
         const userData = userSnap.data();
