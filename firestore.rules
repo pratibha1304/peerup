@@ -83,11 +83,8 @@ service cloud.firestore {
 
       // Tasks under a goal
       match /goals/{goalId}/tasks/{taskId} {
-        // Participants can read/create tasks
-        allow read, create: if request.auth != null && isParticipant(matchId);
-
-        // Update allowed if participant AND (buddy match OR this user is mentee)
-        allow update: if request.auth != null && isParticipant(matchId);
+        // Participants can read/create/update/delete tasks
+        allow read, create, update, delete: if request.auth != null && isParticipant(matchId);
       }
     }
 

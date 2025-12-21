@@ -187,7 +187,12 @@ export default function GoalsView({
   const handleTaskDelete = async (taskId: string) => {
     if (!activeGoal) return
     if (!window.confirm('Remove this task from the goal?')) return
-    await deleteTask(partnershipId, activeGoal.id, taskId)
+    try {
+      await deleteTask(partnershipId, activeGoal.id, taskId)
+    } catch (error) {
+      console.error('Error deleting task:', error)
+      alert('Failed to delete task. Please try again.')
+    }
   }
 
   const handleRegenerateTasks = async () => {
@@ -343,9 +348,16 @@ export default function GoalsView({
                       type="checkbox"
                       checked={youChecked}
                       disabled={!isUnlocked || !canToggle}
-                      onChange={(e) =>
-                        toggleTask(partnershipId, activeGoal.id, t.id, e.target.checked, participants)
-                      }
+                      onChange={async (e) => {
+                        try {
+                          await toggleTask(partnershipId, activeGoal.id, t.id, e.target.checked, participants)
+                        } catch (error) {
+                          console.error('Error toggling task:', error)
+                          alert('Failed to update task. Please try again.')
+                          // Revert checkbox state on error
+                          e.target.checked = !e.target.checked
+                        }
+                      }}
                     />
                     <div className="flex-1 space-y-1">
                       <div className="flex flex-col gap-1">
