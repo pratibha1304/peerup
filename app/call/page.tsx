@@ -644,13 +644,15 @@ export default function CallPage() {
         autoPlay
         playsInline
         muted={false}
-        volume={1.0}
         style={{ display: 'none' }}
         onLoadedData={() => {
-          if (remoteAudioRef.current && remoteAudioRef.current.srcObject) {
-            remoteAudioRef.current.play().catch(err => {
-              console.error('Autoplay blocked, will retry:', err);
-            });
+          if (remoteAudioRef.current) {
+            remoteAudioRef.current.volume = 1.0;
+            if (remoteAudioRef.current.srcObject) {
+              remoteAudioRef.current.play().catch(err => {
+                console.error('Autoplay blocked, will retry:', err);
+              });
+            }
           }
         }}
       />
