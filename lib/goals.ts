@@ -194,23 +194,26 @@ export async function deleteTask(
     const goalRef = doc(db, 'matches', partnershipId, 'goals', goalId)
     const taskRef = doc(goalRef, 'tasks', taskId)
 
+    // ALL READS MUST HAPPEN FIRST
     const taskSnap = await tx.get(taskRef)
-    if (!taskSnap.exists()) return
-    const taskData = taskSnap.data() as Task
-    const wasComplete = !!taskData.isComplete
-
-    tx.delete(taskRef)
-
     const goalSnap = await tx.get(goalRef)
+    
+    if (!taskSnap.exists()) return
     if (!goalSnap.exists()) return
+    
+    const taskData = taskSnap.data() as Task
     const goalData = goalSnap.data() as Goal
+    const wasComplete = !!taskData.isComplete
     const currentCount = goalData.taskCount || 0
     const nextTaskCount = Math.max(0, currentCount - 1)
     let completedCount = goalData.completedTaskCount || 0
+    
     if (wasComplete) {
       completedCount = Math.max(0, completedCount - 1)
     }
 
+    // NOW ALL WRITES CAN HAPPEN
+    tx.delete(taskRef)
     tx.update(goalRef, {
       taskCount: nextTaskCount,
       completedTaskCount: completedCount,
@@ -236,9 +239,15 @@ export async function toggleTask(
     const goalRef = doc(db, 'matches', partnershipId, 'goals', goalId)
     const taskRef = doc(goalRef, 'tasks', taskId)
 
+    // ALL READS MUST HAPPEN FIRST
     const taskSnap = await tx.get(taskRef)
+    const goalSnap = await tx.get(goalRef)
+    
     if (!taskSnap.exists()) throw new Error('Task not found')
+    if (!goalSnap.exists()) return
+    
     const taskData = taskSnap.data() as Task
+    const goalData = goalSnap.data() as Goal
 
     const completedBy = { ...(taskData.completedBy || {}) }
     completedBy[currentUid] = newStatus
@@ -256,11 +265,21 @@ export async function toggleTask(
     if (wasComplete !== isNowComplete) {
       taskUpdates.isComplete = isNowComplete
     }
-    tx.update(taskRef, taskUpdates)
 
-    const goalSnap = await tx.get(goalRef)
-    if (!goalSnap.exists()) return
-    const goalData = goalSnap.data() as Goal
+    // Check for next task to unlock (must be done as part of reads, before any writes)
+    let nextTaskRef = null
+    if (isNowComplete && !wasComplete) {
+      const nextTaskQuery = query(
+        collection(goalRef, 'tasks'),
+        where('order', '>', taskData.order),
+        orderBy('order'),
+        limit(1)
+      )
+      const nextSnap = await tx.get(nextTaskQuery)
+      if (!nextSnap.empty) {
+        nextTaskRef = nextSnap.docs[0].ref
+      }
+    }
 
     let completedCount = goalData.completedTaskCount || 0
     if (!wasComplete && isNowComplete) {
@@ -277,21 +296,14 @@ export async function toggleTask(
       goalUpdates.status =
         completedCount >= (goalData.taskCount || 0) ? 'completed' : 'in-progress'
     }
+
+    // NOW ALL WRITES CAN HAPPEN (after all reads are complete)
+    tx.update(taskRef, taskUpdates)
     if (Object.keys(goalUpdates).length) {
       tx.update(goalRef, goalUpdates)
     }
-
-    if (isNowComplete && !wasComplete) {
-      const nextTaskQuery = query(
-        collection(goalRef, 'tasks'),
-        where('order', '>', taskData.order),
-        orderBy('order'),
-        limit(1)
-      )
-      const nextSnap = await tx.get(nextTaskQuery)
-      if (!nextSnap.empty) {
-        tx.update(nextSnap.docs[0].ref, { unlocked: true })
-      }
+    if (nextTaskRef) {
+      tx.update(nextTaskRef, { unlocked: true })
     }
   })
 }
