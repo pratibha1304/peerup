@@ -143,8 +143,12 @@ export default function CallPage() {
         // Callee: listen for offer and create answer
         const unsubscribe = listenToCallRoom(partnerId, async (data) => {
           if (data.offer && !peerConnection.currentRemoteDescription) {
+            console.log('Callee: Received offer, creating answer...');
+            await peerConnection.setRemoteDescription(new RTCSessionDescription(data.offer));
+            console.log('Callee: Remote description set, creating answer...');
             const answer = await createAnswer(peerConnection, data.offer);
             await saveAnswerToFirestore(partnerId, answer);
+            console.log('Callee: Answer created and saved');
           }
         });
         candidateListenersRef.current.push(unsubscribe);
@@ -220,10 +224,30 @@ export default function CallPage() {
 
   // Update call status when remote stream is received
   useEffect(() => {
-    if (remoteStream && (callStatus === 'ringing' || callStatus === 'connected')) {
+    if (remoteStream) {
+      const audioTracks = remoteStream.getAudioTracks();
+      const videoTracks = remoteStream.getVideoTracks();
+      
+      console.log('✅ Remote stream received:', {
+        audioTracks: audioTracks.length,
+        videoTracks: videoTracks.length,
+        audioEnabled: audioTracks.every(t => t.enabled),
+        videoEnabled: videoTracks.every(t => t.enabled),
+      });
+      
+      // Ensure all audio tracks are enabled
+      audioTracks.forEach(track => {
+        if (!track.enabled) {
+          track.enabled = true;
+          console.log('✅ Enabled remote audio track:', track.id);
+        }
+      });
+      
       // Only update to connected if we have a remote stream
-      setCallStatus('connected');
-      console.log('✅ Remote stream received, call connected');
+      if (callStatus === 'ringing') {
+        setCallStatus('connected');
+        console.log('✅ Call status updated to connected');
+      }
       
       // Stop ringtone when connected
       if (ringtoneIntervalRef.current) {

@@ -25,11 +25,21 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
+  // Check if Google Calendar is configured
+  if (!process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET) {
+    console.error('Google Calendar not configured - missing environment variables');
+    return res.status(400).json({ 
+      error: 'Google Calendar integration is not configured. Please contact support.',
+      details: 'Missing GOOGLE_CLIENT_ID or GOOGLE_CLIENT_SECRET environment variables'
+    });
+  }
+
   const { userId, title, description, startTime, endTime, attendees } = req.body;
 
   if (!userId || !title || !startTime || !endTime) {
     return res.status(400).json({ 
-      error: 'Missing required fields: userId, title, startTime, endTime' 
+      error: 'Missing required fields: userId, title, startTime, endTime',
+      received: { userId: !!userId, title: !!title, startTime: !!startTime, endTime: !!endTime }
     });
   }
 

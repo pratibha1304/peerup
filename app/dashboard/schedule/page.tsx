@@ -152,9 +152,17 @@ function ScheduleContent() {
       setSelectedRequestId(null);
       setSelectedTime(null);
       setMeetingLink("");
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error confirming schedule:', error);
-      alert('Failed to confirm schedule');
+      const errorMessage = error?.message || 'Failed to confirm schedule';
+      const isCalendarError = errorMessage.includes('Calendar') || errorMessage.includes('calendar');
+      
+      if (isCalendarError && meetingLink.trim() === '') {
+        // If calendar creation failed and no link was provided, suggest manual link
+        alert(`Calendar event creation failed: ${errorMessage}\n\nPlease provide a meeting link manually or connect your Google Calendar in Settings.`);
+      } else {
+        alert(`Failed to confirm schedule: ${errorMessage}`);
+      }
     } finally {
       setLoading(false);
     }

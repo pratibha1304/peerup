@@ -401,23 +401,86 @@ export function handleRemoteStream(
   peerConnection: RTCPeerConnection,
   setRemoteStream: (stream: MediaStream | null) => void
 ) {
+  // Use a Map to collect all tracks and create a combined stream
+  const remoteStreams = new Map<string, MediaStream>();
+  
   peerConnection.ontrack = (event) => {
-    const stream = event.streams[0];
-    console.log('Received remote track:', {
+    console.log('Received remote track event:', {
       kind: event.track.kind,
       id: event.track.id,
       enabled: event.track.enabled,
-      streamId: stream?.id,
-      audioTracks: stream?.getAudioTracks().length,
-      videoTracks: stream?.getVideoTracks().length,
+      readyState: event.track.readyState,
+      streamId: event.streams[0]?.id,
     });
     
-    // Ensure audio tracks are enabled
-    stream?.getAudioTracks().forEach(track => {
+    const stream = event.streams[0];
+    if (!stream) {
+      console.warn('No stream in track event');
+      return;
+    }
+    
+    // Store stream by ID
+    remoteStreams.set(stream.id, stream);
+    
+    // Ensure all tracks in the stream are enabled
+    stream.getTracks().forEach(track => {
       track.enabled = true;
+      console.log(`Enabled remote ${track.kind} track:`, track.id);
+      
+      track.onended = () => {
+        console.warn(`Remote ${track.kind} track ended:`, track.id);
+      };
+      
+      track.onmute = () => {
+        console.warn(`Remote ${track.kind} track muted:`, track.id);
+      };
+      
+      track.onunmute = () => {
+        console.log(`Remote ${track.kind} track unmuted:`, track.id);
+      };
     });
     
-    setRemoteStream(stream);
+    // Create a combined stream with all tracks
+    const combinedStream = new MediaStream();
+    remoteStreams.forEach(s => {
+      s.getTracks().forEach(track => {
+        if (!combinedStream.getTracks().find(t => t.id === track.id)) {
+          combinedStream.addTrack(track);
+        }
+      });
+    });
+    
+    console.log('Setting remote stream with tracks:', {
+      audioTracks: combinedStream.getAudioTracks().length,
+      videoTracks: combinedStream.getVideoTracks().length,
+      allTracks: combinedStream.getTracks().map(t => ({
+        kind: t.kind,
+        id: t.id,
+        enabled: t.enabled,
+        readyState: t.readyState,
+      })),
+    });
+    
+    setRemoteStream(combinedStream);
+  };
+  
+  // Also listen for connection state changes to ensure stream is set
+  peerConnection.onconnectionstatechange = () => {
+    console.log('Peer connection state changed:', peerConnection.connectionState);
+    if (peerConnection.connectionState === 'connected') {
+      // Ensure we have the remote stream
+      const receivers = peerConnection.getReceivers();
+      const tracks = receivers.map(r => r.track).filter(Boolean);
+      
+      if (tracks.length > 0) {
+        const stream = new MediaStream(tracks);
+        console.log('Created stream from receivers:', {
+          audioTracks: stream.getAudioTracks().length,
+          videoTracks: stream.getVideoTracks().length,
+        });
+        setRemoteStream(stream);
+      }
+    }
   };
 }
 
