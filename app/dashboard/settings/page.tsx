@@ -34,7 +34,12 @@ export default function SettingsPage() {
     
     const clientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
     if (!clientId) {
-      alert('Google Calendar integration is not configured. Please contact support.');
+      console.error('NEXT_PUBLIC_GOOGLE_CLIENT_ID is not set. Available env vars:', {
+        hasClientId: !!process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID,
+        hasAppUrl: !!process.env.NEXT_PUBLIC_APP_URL,
+        allEnvKeys: Object.keys(process.env).filter(k => k.startsWith('NEXT_PUBLIC_')),
+      });
+      alert('Google Calendar integration is not configured. Please contact support.\n\nMake sure NEXT_PUBLIC_GOOGLE_CLIENT_ID is set in environment variables and the site has been redeployed.');
       return;
     }
 
