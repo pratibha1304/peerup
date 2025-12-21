@@ -205,7 +205,9 @@ export default function GoalsView({
       return
     setIsRegenerating(true)
     try {
+      console.log('Clearing existing tasks...')
       await clearGoalTasks(partnershipId, activeGoal.id)
+      console.log('Tasks cleared, generating new tasks...')
       const response = await fetch('/api/ai/breakdown-goal', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

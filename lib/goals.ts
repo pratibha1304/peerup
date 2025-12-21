@@ -131,14 +131,30 @@ export async function clearGoalTasks(partnershipId: string, goalId: string) {
   const goalRef = doc(db, 'matches', partnershipId, 'goals', goalId)
   const tasksRef = collection(goalRef, 'tasks')
   const snap = await getDocs(tasksRef)
+  
+  if (snap.empty) {
+    // No tasks to delete, just update goal stats
+    await updateDoc(goalRef, {
+      taskCount: 0,
+      completedTaskCount: 0,
+      status: 'in-progress',
+    })
+    return
+  }
+  
   const batch = writeBatch(db)
-  snap.forEach((taskDoc) => batch.delete(taskDoc.ref))
+  snap.forEach((taskDoc) => {
+    batch.delete(taskDoc.ref)
+  })
+  
   batch.update(goalRef, {
     taskCount: 0,
     completedTaskCount: 0,
     status: 'in-progress',
   })
+  
   await batch.commit()
+  console.log(`Cleared ${snap.size} tasks from goal ${goalId}`)
 }
 
 export async function deleteGoal(partnershipId: string, goalId: string) {
