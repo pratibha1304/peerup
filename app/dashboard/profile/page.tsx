@@ -98,36 +98,29 @@ export default function ProfilePage() {
       throw new Error("No 2d context");
     }
 
-    const maxSize = Math.max(image.width, image.height);
-    const safeArea = 2 * ((maxSize / 2) * Math.sqrt(2));
-
-    canvas.width = safeArea;
-    canvas.height = safeArea;
-
-    ctx.translate(safeArea / 2, safeArea / 2);
-    ctx.translate(-safeArea / 2, -safeArea / 2);
-
-    ctx.drawImage(
-      image,
-      safeArea / 2 - image.width * 0.5,
-      safeArea / 2 - image.height * 0.5
-    );
-
-    const data = ctx.getImageData(0, 0, safeArea, safeArea);
-
+    // Set canvas size to match the crop area
     canvas.width = pixelCrop.width;
     canvas.height = pixelCrop.height;
 
-    ctx.putImageData(
-      data,
-      Math.round(0 - safeArea / 2 + image.width * 0.5 - pixelCrop.x),
-      Math.round(0 - safeArea / 2 + image.height * 0.5 - pixelCrop.y)
+    // Draw the cropped portion of the image
+    ctx.drawImage(
+      image,
+      pixelCrop.x,
+      pixelCrop.y,
+      pixelCrop.width,
+      pixelCrop.height,
+      0,
+      0,
+      pixelCrop.width,
+      pixelCrop.height
     );
 
-    return new Promise((resolve) => {
+    return new Promise((resolve, reject) => {
       canvas.toBlob((blob) => {
         if (blob) {
           resolve(blob);
+        } else {
+          reject(new Error("Failed to create blob"));
         }
       }, "image/jpeg", 0.95);
     });
@@ -404,17 +397,22 @@ export default function ProfilePage() {
                 onChange={handleFileChange}
                 className="hidden"
               />
-              <div className="flex gap-2 mt-2">
+              <div className="flex gap-2 mt-2 justify-center">
                 {profilePicUrl && (
                   <>
                     <button
                       onClick={() => {
-                        if (profilePic) {
+                        // Create a blob URL from the current image if needed
+                        if (profilePicUrl.startsWith('blob:') || profilePicUrl.startsWith('http')) {
                           setCropImage(profilePicUrl);
+                          setShowCropModal(true);
+                        } else if (profilePic) {
+                          const previewUrl = URL.createObjectURL(profilePic);
+                          setCropImage(previewUrl);
                           setShowCropModal(true);
                         }
                       }}
-                      className="px-3 py-1 text-xs bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition flex items-center gap-1"
+                      className="px-3 py-1.5 text-xs bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition flex items-center gap-1"
                       title="Crop image"
                     >
                       <Crop className="w-3 h-3" />
@@ -422,7 +420,7 @@ export default function ProfilePage() {
                     </button>
                     <button
                       onClick={handleDeleteProfilePic}
-                      className="px-3 py-1 text-xs bg-red-500 text-white rounded-lg hover:bg-red-600 transition flex items-center gap-1"
+                      className="px-3 py-1.5 text-xs bg-red-500 text-white rounded-lg hover:bg-red-600 transition flex items-center gap-1"
                       title="Delete picture"
                     >
                       <X className="w-3 h-3" />

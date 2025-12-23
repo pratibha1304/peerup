@@ -7,16 +7,20 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Heart, Users, MessageCircle, Search, Filter, MapPin, Clock, Target, Zap, ArrowLeft } from "lucide-react";
+import { Heart, Users, MessageCircle, Search, Filter, MapPin, Clock, Target, Zap, ArrowLeft, Send } from "lucide-react";
 import { auth, db } from "@/lib/firebase";
 import { onAuthStateChanged } from "firebase/auth";
 import { doc, getDoc } from "firebase/firestore";
+import { sendMatchRequest } from "@/lib/matchRequests";
+import { useRouter } from "next/navigation";
 
 export default function BuddyMatchPage() {
+  const router = useRouter();
   const [searchQuery, setSearchQuery] = useState("");
   const [matches, setMatches] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [sendingRequest, setSendingRequest] = useState<string | null>(null);
 
   useEffect(() => {
     let unsub: any;
@@ -202,15 +206,43 @@ export default function BuddyMatchPage() {
                         </div>
 
                         <div className="flex space-x-3">
-                          <Button className="flex-1 bg-[#CBD83B] hover:bg-[#CBD83B]/90 text-black rounded-xl">
-                            <MessageCircle className="w-4 h-4 mr-2" />
-                            Connect
+                          <Button 
+                            className="flex-1 bg-[#CBD83B] hover:bg-[#CBD83B]/90 text-black rounded-xl"
+                            onClick={async () => {
+                              const user = auth.currentUser;
+                              if (!user) {
+                                alert('Please sign in to send a request');
+                                return;
+                              }
+                              setSendingRequest(buddy.uid);
+                              try {
+                                await sendMatchRequest(buddy.uid);
+                                alert('Request sent successfully!');
+                              } catch (e: any) {
+                                console.error(e);
+                                alert('Failed to send request: ' + (e.message || 'Unknown error'));
+                              } finally {
+                                setSendingRequest(null);
+                              }
+                            }}
+                            disabled={sendingRequest === buddy.uid}
+                          >
+                            {sendingRequest === buddy.uid ? (
+                              <>Sending...</>
+                            ) : (
+                              <>
+                                <Send className="w-4 h-4 mr-2" />
+                                Connect
+                              </>
+                            )}
                           </Button>
                           <Button
                             variant="outline"
                             className="rounded-xl border-[#A88AED] text-[#A88AED] hover:bg-[#A88AED]/10 bg-transparent"
+                            onClick={() => router.push(`/dashboard/chats?u=${buddy.uid}`)}
                           >
-                            View Profile
+                            <MessageCircle className="w-4 h-4 mr-2" />
+                            Message
                           </Button>
                         </div>
                       </div>

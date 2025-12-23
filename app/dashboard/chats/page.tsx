@@ -2,10 +2,11 @@
 import { useEffect, useMemo, useState, Suspense, useRef } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
-import { getOrCreateChat, listenToMessages, listenToUserChats, sendMessage, markChatAsRead } from '@/lib/chat';
-import { db } from '@/lib/firebase';
+import { getOrCreateChat, listenToMessages, listenToUserChats, sendMessage, markChatAsRead, editMessage, deleteMessage, sendMessageWithFile } from '@/lib/chat';
+import { db, storage } from '@/lib/firebase';
 import { doc, getDoc } from 'firebase/firestore';
-import { ArrowLeft } from 'lucide-react';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { ArrowLeft, Edit2, Trash2, Image as ImageIcon, Paperclip, X } from 'lucide-react';
 
 function ChatsContent() {
   const { user } = useAuth();
@@ -17,6 +18,13 @@ function ChatsContent() {
   const [userNames, setUserNames] = useState<Record<string, string>>({});
   const [messagesLoading, setMessagesLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
+  const [editText, setEditText] = useState('');
+  const [uploadingFile, setUploadingFile] = useState(false);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [selectedImage, setSelectedImage] = useState<File | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const imageInputRef = useRef<HTMLInputElement>(null);
 
   const otherUidFromQuery = params.get('u');
 
@@ -99,13 +107,88 @@ function ChatsContent() {
   }, [messages]);
 
   const handleSend = async () => {
-    if (!user || !currentChatId || !input.trim()) return;
-    await sendMessage(currentChatId, user.uid, input.trim());
-    setInput('');
+    if (!user || !currentChatId) return;
+    
+    if (selectedImage) {
+      setUploadingFile(true);
+      try {
+        const imageRef = ref(storage, `chat-images/${user.uid}/${Date.now()}-${selectedImage.name}`);
+        await uploadBytes(imageRef, selectedImage);
+        const imageUrl = await getDownloadURL(imageRef);
+        await sendMessageWithFile(currentChatId, user.uid, input.trim() || '[Image]', undefined, undefined, imageUrl);
+        setInput('');
+        setSelectedImage(null);
+      } catch (error) {
+        console.error('Error uploading image:', error);
+        alert('Failed to upload image. Please try again.');
+      } finally {
+        setUploadingFile(false);
+      }
+    } else if (selectedFile) {
+      setUploadingFile(true);
+      try {
+        const fileRef = ref(storage, `chat-files/${user.uid}/${Date.now()}-${selectedFile.name}`);
+        await uploadBytes(fileRef, selectedFile);
+        const fileUrl = await getDownloadURL(fileRef);
+        await sendMessageWithFile(currentChatId, user.uid, input.trim() || `[File: ${selectedFile.name}]`, fileUrl, selectedFile.name);
+        setInput('');
+        setSelectedFile(null);
+      } catch (error) {
+        console.error('Error uploading file:', error);
+        alert('Failed to upload file. Please try again.');
+      } finally {
+        setUploadingFile(false);
+      }
+    } else if (input.trim()) {
+      await sendMessage(currentChatId, user.uid, input.trim());
+      setInput('');
+    }
+    
     // Scroll to bottom after sending
     setTimeout(() => {
       messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     }, 100);
+  };
+
+  const handleEdit = (message: any) => {
+    setEditingMessageId(message.id);
+    setEditText(message.text);
+  };
+
+  const handleSaveEdit = async () => {
+    if (!currentChatId || !editingMessageId || !editText.trim()) return;
+    try {
+      await editMessage(currentChatId, editingMessageId, editText.trim());
+      setEditingMessageId(null);
+      setEditText('');
+    } catch (error) {
+      console.error('Error editing message:', error);
+      alert('Failed to edit message. Please try again.');
+    }
+  };
+
+  const handleDelete = async (messageId: string) => {
+    if (!currentChatId) return;
+    if (!window.confirm('Are you sure you want to delete this message?')) return;
+    try {
+      await deleteMessage(currentChatId, messageId);
+    } catch (error) {
+      console.error('Error deleting message:', error);
+      alert('Failed to delete message. Please try again.');
+    }
+  };
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (file.type.startsWith('image/')) {
+        setSelectedImage(file);
+        setSelectedFile(null);
+      } else {
+        setSelectedFile(file);
+        setSelectedImage(null);
+      }
+    }
   };
 
   const openChat = (chatId: string) => {
@@ -209,22 +292,104 @@ function ChatsContent() {
                 <div className="text-sm text-gray-500 text-center py-4">Loading messages...</div>
               ) : (
                 <>
-                  {messages.map((m) => (
-                    <div
-                      key={m.id}
-                      className={`flex ${(m.senderId === user?.uid || m.senderUid === user?.uid) ? 'justify-end' : 'justify-start'}`}
-                    >
+                  {messages.map((m) => {
+                    const isOwnMessage = m.senderId === user?.uid || m.senderUid === user?.uid;
+                    const isEditing = editingMessageId === m.id;
+                    
+                    return (
                       <div
-                        className={`max-w-[75%] px-4 py-2 rounded-2xl text-sm ${
-                          (m.senderId === user?.uid || m.senderUid === user?.uid)
-                            ? 'bg-indigo-600 text-white rounded-br-sm'
-                            : 'bg-white text-gray-800 rounded-bl-sm shadow-sm'
-                        }`}
+                        key={m.id}
+                        className={`flex ${isOwnMessage ? 'justify-end' : 'justify-start'} group`}
                       >
-                        {m.text}
+                        <div className={`max-w-[75%] ${isOwnMessage ? 'flex flex-col items-end' : 'flex flex-col items-start'}`}>
+                          <div
+                            className={`px-4 py-2 rounded-2xl text-sm relative ${
+                              isOwnMessage
+                                ? 'bg-indigo-600 text-white rounded-br-sm'
+                                : 'bg-white text-gray-800 rounded-bl-sm shadow-sm'
+                            } ${m.deleted ? 'opacity-60 italic' : ''}`}
+                          >
+                            {isEditing ? (
+                              <div className="flex flex-col gap-2">
+                                <input
+                                  value={editText}
+                                  onChange={(e) => setEditText(e.target.value)}
+                                  className="bg-white text-gray-800 px-2 py-1 rounded border"
+                                  autoFocus
+                                  onKeyDown={(e) => {
+                                    if (e.key === 'Enter' && !e.shiftKey) {
+                                      e.preventDefault();
+                                      handleSaveEdit();
+                                    }
+                                    if (e.key === 'Escape') {
+                                      setEditingMessageId(null);
+                                      setEditText('');
+                                    }
+                                  }}
+                                />
+                                <div className="flex gap-2 justify-end">
+                                  <button
+                                    onClick={() => {
+                                      setEditingMessageId(null);
+                                      setEditText('');
+                                    }}
+                                    className="text-xs px-2 py-1 bg-gray-200 text-gray-700 rounded"
+                                  >
+                                    Cancel
+                                  </button>
+                                  <button
+                                    onClick={handleSaveEdit}
+                                    className="text-xs px-2 py-1 bg-indigo-600 text-white rounded"
+                                  >
+                                    Save
+                                  </button>
+                                </div>
+                              </div>
+                            ) : (
+                              <>
+                                {m.imageUrl && (
+                                  <img src={m.imageUrl} alt="Shared image" className="max-w-full h-auto rounded-lg mb-2" />
+                                )}
+                                {m.fileUrl && (
+                                  <a
+                                    href={m.fileUrl}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="block mb-2 text-blue-400 hover:underline flex items-center gap-2"
+                                  >
+                                    <Paperclip className="w-4 h-4" />
+                                    {m.fileName || 'Download file'}
+                                  </a>
+                                )}
+                                <div>{m.deleted ? '[Message deleted]' : m.text}</div>
+                                {m.edited && !m.deleted && (
+                                  <div className="text-xs opacity-70 mt-1">(edited)</div>
+                                )}
+                              </>
+                            )}
+                          </div>
+                          {isOwnMessage && !isEditing && !m.deleted && (
+                            <div className="flex gap-1 mt-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                              <button
+                                onClick={() => handleEdit(m)}
+                                className="p-1 rounded hover:bg-gray-200 text-gray-600"
+                                title="Edit message"
+                              >
+                                <Edit2 className="w-3 h-3" />
+                              </button>
+                              <button
+                                onClick={() => handleDelete(m.id)}
+                                className="p-1 rounded hover:bg-gray-200 text-red-600"
+                                title="Delete message"
+                              >
+                                <Trash2 className="w-3 h-3" />
+                              </button>
+                            </div>
+                          )}
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                   {!messagesLoading && messages.length === 0 && (
                     <div className="text-sm text-gray-500 text-center py-8">No messages. Say hello!</div>
                   )}
@@ -235,22 +400,70 @@ function ChatsContent() {
 
             {/* Input Area */}
             <div className="px-4 py-3 border-t bg-white">
-              <div className="flex gap-2">
+              {(selectedFile || selectedImage) && (
+                <div className="mb-2 flex items-center gap-2 p-2 bg-gray-100 rounded-lg">
+                  <span className="text-sm text-gray-600">
+                    {selectedImage ? `Image: ${selectedImage.name}` : `File: ${selectedFile?.name}`}
+                  </span>
+                  <button
+                    onClick={() => {
+                      setSelectedFile(null);
+                      setSelectedImage(null);
+                    }}
+                    className="ml-auto p-1 hover:bg-gray-200 rounded"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+              )}
+              <div className="flex gap-2 items-center">
+                <div className="flex gap-1">
+                  <input
+                    ref={imageInputRef}
+                    type="file"
+                    accept="image/*"
+                    onChange={handleFileSelect}
+                    className="hidden"
+                  />
+                  <button
+                    onClick={() => imageInputRef.current?.click()}
+                    className="p-2 rounded-full hover:bg-gray-100 text-gray-600"
+                    title="Upload image"
+                  >
+                    <ImageIcon className="w-5 h-5" />
+                  </button>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    onChange={handleFileSelect}
+                    className="hidden"
+                  />
+                  <button
+                    onClick={() => fileInputRef.current?.click()}
+                    className="p-2 rounded-full hover:bg-gray-100 text-gray-600"
+                    title="Upload file"
+                  >
+                    <Paperclip className="w-5 h-5" />
+                  </button>
+                </div>
                 <input
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
                   onKeyDown={(e) => {
-                    if (e.key === 'Enter') handleSend();
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                      e.preventDefault();
+                      handleSend();
+                    }
                   }}
                   placeholder="Type a message..."
                   className="flex-1 border border-gray-300 rounded-full px-4 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"
                 />
                 <button
                   onClick={handleSend}
-                  disabled={!input.trim()}
+                  disabled={(!input.trim() && !selectedFile && !selectedImage) || uploadingFile}
                   className="px-6 py-2 rounded-full bg-indigo-600 text-white disabled:opacity-50 disabled:cursor-not-allowed hover:bg-indigo-700 transition-colors"
                 >
-                  Send
+                  {uploadingFile ? 'Uploading...' : 'Send'}
                 </button>
               </div>
             </div>

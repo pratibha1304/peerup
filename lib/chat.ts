@@ -3,14 +3,17 @@ import {
   collection,
   doc,
   getDoc,
+  getDocs,
   setDoc,
   addDoc,
   query,
   where,
   orderBy,
+  limit,
   onSnapshot,
   serverTimestamp,
   updateDoc,
+  deleteDoc,
   Timestamp,
   increment,
 } from 'firebase/firestore';
@@ -33,6 +36,11 @@ export type ChatMessage = {
   text: string;
   timestamp: Timestamp;
   createdAt?: Timestamp; // Legacy field for backward compatibility
+  imageUrl?: string;
+  fileUrl?: string;
+  fileName?: string;
+  edited?: boolean;
+  deleted?: boolean;
 };
 
 function getDeterministicChatId(a: string, b: string) {
@@ -161,6 +169,127 @@ export async function markChatAsRead(chatId: string, uid: string) {
   await updateDoc(chatRef, {
     [`unreadCounts.${uid}`]: 0,
   });
+}
+
+export async function editMessage(chatId: string, messageId: string, newText: string) {
+  const messageRef = doc(db, 'chats', chatId, 'messages', messageId);
+  await updateDoc(messageRef, {
+    text: newText,
+    edited: true,
+  });
+  
+  // Update chat last message if this was the last message
+  const chatRef = doc(db, 'chats', chatId);
+  const messagesRef = collection(db, 'chats', chatId, 'messages');
+  const messagesQuery = query(messagesRef, orderBy('timestamp', 'desc'), limit(1));
+  const lastMsgSnapshot = await getDocs(messagesQuery);
+  
+  if (!lastMsgSnapshot.empty && lastMsgSnapshot.docs[0].id === messageId) {
+    await updateDoc(chatRef, {
+      lastMessage: newText,
+    });
+  }
+}
+
+export async function deleteMessage(chatId: string, messageId: string) {
+  const messageRef = doc(db, 'chats', chatId, 'messages', messageId);
+  await updateDoc(messageRef, {
+    text: '[Message deleted]',
+    deleted: true,
+  });
+  
+  // Update chat last message if this was the last message
+  const chatRef = doc(db, 'chats', chatId);
+  const messagesRef = collection(db, 'chats', chatId, 'messages');
+  const messagesQuery = query(messagesRef, orderBy('timestamp', 'desc'), limit(1));
+  const lastMsgSnapshot = await getDocs(messagesQuery);
+  
+  if (!lastMsgSnapshot.empty && lastMsgSnapshot.docs[0].id === messageId) {
+    // Find the previous message
+    const prevMessagesQuery = query(messagesRef, orderBy('timestamp', 'desc'), limit(2));
+    const prevMsgsSnapshot = await getDocs(prevMessagesQuery);
+    const prevMsg = prevMsgsSnapshot.docs.find(d => d.id !== messageId);
+    
+    if (prevMsg) {
+      const prevMsgData = prevMsg.data();
+      await updateDoc(chatRef, {
+        lastMessage: prevMsgData.deleted ? '[Message deleted]' : prevMsgData.text,
+      });
+    } else {
+      await updateDoc(chatRef, {
+        lastMessage: '',
+      });
+    }
+  }
+}
+
+export async function sendMessageWithFile(chatId: string, senderId: string, text: string, fileUrl?: string, fileName?: string, imageUrl?: string) {
+  const msgsRef = collection(db, 'chats', chatId, 'messages');
+  await addDoc(msgsRef, {
+    text,
+    senderId,
+    timestamp: serverTimestamp(),
+    ...(fileUrl && { fileUrl, fileName }),
+    ...(imageUrl && { imageUrl }),
+  });
+
+  const chatRef = doc(db, 'chats', chatId);
+  const chatSnap = await getDoc(chatRef);
+  const chatData = chatSnap.exists() ? (chatSnap.data() as Chat) : null;
+  const participants = chatData?.participants || [];
+  const unreadUpdates: Record<string, any> = {};
+  const receiverId = participants.find((uid) => uid !== senderId);
+  
+  const displayText = imageUrl ? '[Image]' : (fileUrl ? `[File: ${fileName || 'attachment'}]` : text);
+  
+  participants.forEach((uid) => {
+    unreadUpdates[`unreadCounts.${uid}`] = uid === senderId ? 0 : increment(1);
+  });
+  await updateDoc(chatRef, {
+    lastMessage: displayText,
+    lastMessageTimestamp: serverTimestamp(),
+    lastMessageSenderId: senderId,
+    ...unreadUpdates,
+  });
+
+  // Send email notification to receiver
+  if (receiverId) {
+    try {
+      const [senderDoc, receiverDoc] = await Promise.all([
+        getDoc(doc(db, 'users', senderId)),
+        getDoc(doc(db, 'users', receiverId))
+      ]);
+      
+      const senderData = senderDoc.exists() ? senderDoc.data() : null;
+      const receiverData = receiverDoc.exists() ? receiverDoc.data() : null;
+      
+      if (receiverData?.email) {
+        const response = await fetch('/api/email/send', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            type: 'new_message',
+            data: {
+              to: receiverData.email,
+              toName: receiverData.name || 'User',
+              fromName: senderData?.name || 'Someone',
+              message: displayText.length > 100 ? displayText.substring(0, 100) + '...' : displayText,
+              actionUrl: `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/dashboard/chats?u=${senderId}`
+            }
+          })
+        });
+        
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}));
+          console.error('Email API error:', response.status, errorData);
+        } else {
+          console.log('✅ Email notification sent for new message');
+        }
+      }
+    } catch (error) {
+      console.error('❌ Failed to send message email notification:', error);
+    }
+  }
 }
 
 

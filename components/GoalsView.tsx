@@ -185,13 +185,18 @@ export default function GoalsView({
   }
 
   const handleTaskDelete = async (taskId: string) => {
-    if (!activeGoal) return
+    if (!activeGoal) {
+      alert('No active goal selected. Please select a goal first.')
+      return
+    }
     if (!window.confirm('Remove this task from the goal?')) return
     try {
+      console.log('Deleting task:', taskId, 'from goal:', activeGoal.id)
       await deleteTask(partnershipId, activeGoal.id, taskId)
+      console.log('Task deleted successfully')
     } catch (error) {
       console.error('Error deleting task:', error)
-      alert('Failed to delete task. Please try again.')
+      alert('Failed to delete task: ' + (error instanceof Error ? error.message : 'Unknown error'))
     }
   }
 
@@ -404,8 +409,12 @@ export default function GoalsView({
                         </button>
                         <button
                           type="button"
-                          className="text-red-600 hover:underline"
-                          onClick={() => handleTaskDelete(t.id)}
+                          className="text-red-600 hover:underline cursor-pointer"
+                          onClick={(e) => {
+                            e.preventDefault()
+                            e.stopPropagation()
+                            handleTaskDelete(t.id)
+                          }}
                         >
                           Delete
                         </button>
