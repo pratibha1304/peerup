@@ -257,37 +257,50 @@ export default function CallPage() {
     }
   }, [remoteStream, callStatus]);
 
-  // Play ringtone for incoming/outgoing calls
+  // Play pleasant ringtone for incoming/outgoing calls
   useEffect(() => {
     if (callStatus === 'ringing' && !isLoading) {
-      // Generate ringtone using Web Audio API
       const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
-      let oscillator1: OscillatorNode | null = null;
-      let oscillator2: OscillatorNode | null = null;
+      let oscillators: OscillatorNode[] = [];
       let gainNode: GainNode | null = null;
       
       const playTone = () => {
         try {
-          oscillator1 = audioContext.createOscillator();
-          oscillator2 = audioContext.createOscillator();
+          // Create a pleasant, soft ringtone using multiple harmonics
+          // Using musical notes: C5 (523.25 Hz) and E5 (659.25 Hz) - pleasant major third
+          const frequencies = [523.25, 659.25]; // C5 and E5 notes
           gainNode = audioContext.createGain();
           
-          oscillator1.frequency.value = 800;
-          oscillator2.frequency.value = 1000;
-          gainNode.gain.value = 0.3;
+          // Soft, pleasant volume
+          gainNode.gain.setValueAtTime(0.15, audioContext.currentTime);
+          gainNode.gain.exponentialRampToValueAtTime(0.25, audioContext.currentTime + 0.1);
+          gainNode.gain.exponentialRampToValueAtTime(0.15, audioContext.currentTime + 0.3);
           
-          oscillator1.connect(gainNode);
-          oscillator2.connect(gainNode);
+          frequencies.forEach((freq, index) => {
+            const oscillator = audioContext.createOscillator();
+            oscillator.type = 'sine'; // Sine wave for smooth, pleasant sound
+            oscillator.frequency.value = freq;
+            
+            // Add slight delay for harmony effect
+            const delay = audioContext.createDelay();
+            delay.delayTime.value = index * 0.05;
+            
+            oscillator.connect(delay);
+            delay.connect(gainNode!);
+            oscillator.start();
+            
+            oscillators.push(oscillator);
+          });
+          
           gainNode.connect(audioContext.destination);
           
-          oscillator1.start();
-          oscillator2.start();
-          
-          // Stop after 0.4 seconds
+          // Stop after 0.5 seconds (pleasant duration)
           setTimeout(() => {
-            if (oscillator1) oscillator1.stop();
-            if (oscillator2) oscillator2.stop();
-          }, 400);
+            oscillators.forEach(osc => {
+              try { osc.stop(); } catch (e) {}
+            });
+            oscillators = [];
+          }, 500);
         } catch (error) {
           console.error('Error playing ringtone:', error);
         }
@@ -296,20 +309,21 @@ export default function CallPage() {
       // Play immediately
       playTone();
       
-      // Play every 1 second
+      // Play every 1.5 seconds (less frequent, more pleasant)
       ringtoneIntervalRef.current = setInterval(() => {
         if (callStatus === 'ringing' && !isLoading) {
           playTone();
         }
-      }, 1000);
+      }, 1500);
       
       return () => {
         if (ringtoneIntervalRef.current) {
           clearInterval(ringtoneIntervalRef.current);
           ringtoneIntervalRef.current = null;
         }
-        if (oscillator1) try { oscillator1.stop(); } catch (e) {}
-        if (oscillator2) try { oscillator2.stop(); } catch (e) {}
+        oscillators.forEach(osc => {
+          try { osc.stop(); } catch (e) {}
+        });
         if (audioContext.state !== 'closed') {
           audioContext.close().catch(() => {});
         }
@@ -648,11 +662,19 @@ export default function CallPage() {
         onLoadedData={() => {
           if (remoteAudioRef.current) {
             remoteAudioRef.current.volume = 1.0;
+            remoteAudioRef.current.muted = false;
             if (remoteAudioRef.current.srcObject) {
               remoteAudioRef.current.play().catch(err => {
                 console.error('Autoplay blocked, will retry:', err);
               });
             }
+          }
+        }}
+        onPlay={() => {
+          console.log('✅ Remote audio is playing');
+          if (remoteAudioRef.current) {
+            remoteAudioRef.current.volume = 1.0;
+            remoteAudioRef.current.muted = false;
           }
         }}
       />

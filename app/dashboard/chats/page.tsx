@@ -26,7 +26,7 @@ function ChatsContent() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
 
-  const otherUidFromQuery = params.get('u');
+  const otherUidFromQuery = params?.get('u') || null;
 
   useEffect(() => {
     if (!user) return;
@@ -107,35 +107,52 @@ function ChatsContent() {
   }, [messages]);
 
   const handleSend = async () => {
-    if (!user || !currentChatId) return;
+    if (!user || !currentChatId) {
+      alert('Please select a chat first');
+      return;
+    }
     
     if (selectedImage) {
       setUploadingFile(true);
       try {
+        console.log('Uploading image:', selectedImage.name, selectedImage.size);
         const imageRef = ref(storage, `chat-images/${user.uid}/${Date.now()}-${selectedImage.name}`);
+        console.log('Uploading to:', imageRef.fullPath);
         await uploadBytes(imageRef, selectedImage);
+        console.log('Upload complete, getting download URL...');
         const imageUrl = await getDownloadURL(imageRef);
+        console.log('Image URL:', imageUrl);
         await sendMessageWithFile(currentChatId, user.uid, input.trim() || '[Image]', undefined, undefined, imageUrl);
         setInput('');
         setSelectedImage(null);
-      } catch (error) {
+        // Reset file inputs
+        if (imageInputRef.current) imageInputRef.current.value = '';
+      } catch (error: any) {
         console.error('Error uploading image:', error);
-        alert('Failed to upload image. Please try again.');
+        const errorMsg = error.message || 'Failed to upload image. Please check your connection and try again.';
+        alert(errorMsg);
       } finally {
         setUploadingFile(false);
       }
     } else if (selectedFile) {
       setUploadingFile(true);
       try {
+        console.log('Uploading file:', selectedFile.name, selectedFile.size);
         const fileRef = ref(storage, `chat-files/${user.uid}/${Date.now()}-${selectedFile.name}`);
+        console.log('Uploading to:', fileRef.fullPath);
         await uploadBytes(fileRef, selectedFile);
+        console.log('Upload complete, getting download URL...');
         const fileUrl = await getDownloadURL(fileRef);
+        console.log('File URL:', fileUrl);
         await sendMessageWithFile(currentChatId, user.uid, input.trim() || `[File: ${selectedFile.name}]`, fileUrl, selectedFile.name);
         setInput('');
         setSelectedFile(null);
-      } catch (error) {
+        // Reset file inputs
+        if (fileInputRef.current) fileInputRef.current.value = '';
+      } catch (error: any) {
         console.error('Error uploading file:', error);
-        alert('Failed to upload file. Please try again.');
+        const errorMsg = error.message || 'Failed to upload file. Please check your connection and try again.';
+        alert(errorMsg);
       } finally {
         setUploadingFile(false);
       }
@@ -181,14 +198,30 @@ function ChatsContent() {
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
+      // Check file size (limit to 10MB for images, 50MB for files)
+      const maxImageSize = 10 * 1024 * 1024; // 10MB
+      const maxFileSize = 50 * 1024 * 1024; // 50MB
+      
       if (file.type.startsWith('image/')) {
+        if (file.size > maxImageSize) {
+          alert('Image size must be less than 10MB');
+          e.target.value = ''; // Reset input
+          return;
+        }
         setSelectedImage(file);
         setSelectedFile(null);
       } else {
+        if (file.size > maxFileSize) {
+          alert('File size must be less than 50MB');
+          e.target.value = ''; // Reset input
+          return;
+        }
         setSelectedFile(file);
         setSelectedImage(null);
       }
     }
+    // Reset input to allow selecting the same file again
+    e.target.value = '';
   };
 
   const openChat = (chatId: string) => {

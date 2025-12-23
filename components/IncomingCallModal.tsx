@@ -144,28 +144,45 @@ export function IncomingCallModal() {
     if (incomingCall && !isResponding) {
       const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
       
+      let oscillators: OscillatorNode[] = [];
+      
       const playTone = () => {
         try {
-          const oscillator1 = audioContext.createOscillator();
-          const oscillator2 = audioContext.createOscillator();
+          // Create a pleasant, soft ringtone using musical notes
+          // Using C5 (523.25 Hz) and E5 (659.25 Hz) - pleasant major third
+          const frequencies = [523.25, 659.25];
           const gainNode = audioContext.createGain();
           
-          oscillator1.frequency.value = 800;
-          oscillator2.frequency.value = 1000;
-          gainNode.gain.value = 0.3;
+          // Soft, pleasant volume
+          gainNode.gain.setValueAtTime(0.15, audioContext.currentTime);
+          gainNode.gain.exponentialRampToValueAtTime(0.25, audioContext.currentTime + 0.1);
+          gainNode.gain.exponentialRampToValueAtTime(0.15, audioContext.currentTime + 0.3);
           
-          oscillator1.connect(gainNode);
-          oscillator2.connect(gainNode);
+          frequencies.forEach((freq, index) => {
+            const oscillator = audioContext.createOscillator();
+            oscillator.type = 'sine'; // Sine wave for smooth, pleasant sound
+            oscillator.frequency.value = freq;
+            
+            // Add slight delay for harmony effect
+            const delay = audioContext.createDelay();
+            delay.delayTime.value = index * 0.05;
+            
+            oscillator.connect(delay);
+            delay.connect(gainNode);
+            oscillator.start();
+            
+            oscillators.push(oscillator);
+          });
+          
           gainNode.connect(audioContext.destination);
           
-          oscillator1.start();
-          oscillator2.start();
-          
-          // Stop after 0.4 seconds
+          // Stop after 0.5 seconds (pleasant duration)
           setTimeout(() => {
-            oscillator1.stop();
-            oscillator2.stop();
-          }, 400);
+            oscillators.forEach(osc => {
+              try { osc.stop(); } catch (e) {}
+            });
+            oscillators = [];
+          }, 500);
         } catch (error) {
           console.error('Error playing ringtone:', error);
         }
@@ -174,18 +191,21 @@ export function IncomingCallModal() {
       // Play immediately
       playTone();
       
-      // Play every 1 second
+      // Play every 1.5 seconds (less frequent, more pleasant)
       ringtoneIntervalRef.current = setInterval(() => {
         if (incomingCall && !isResponding) {
           playTone();
         }
-      }, 1000);
+      }, 1500);
       
       return () => {
         if (ringtoneIntervalRef.current) {
           clearInterval(ringtoneIntervalRef.current);
           ringtoneIntervalRef.current = null;
         }
+        oscillators.forEach(osc => {
+          try { osc.stop(); } catch (e) {}
+        });
         if (audioContext.state !== 'closed') {
           audioContext.close().catch(() => {});
         }

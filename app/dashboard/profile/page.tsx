@@ -7,7 +7,7 @@ import { PROFILE_TAGS } from "@/lib/profile-options";
 import { useAuth } from "@/lib/auth-context";
 import { storage } from "@/lib/firebase";
 import Cropper from "react-easy-crop";
-import { Area } from "react-easy-crop/types";
+import { Area } from "react-easy-crop";
 
 const ROLES = [
   { value: "mentor", label: "Mentor", desc: "Guide others, share your expertise" },
@@ -98,31 +98,54 @@ export default function ProfilePage() {
       throw new Error("No 2d context");
     }
 
-    // Set canvas size to match the crop area
-    canvas.width = pixelCrop.width;
-    canvas.height = pixelCrop.height;
+    // Use high DPI for better quality (like WhatsApp)
+    const scaleX = image.naturalWidth / image.width;
+    const scaleY = image.naturalHeight / image.height;
+    
+    // Calculate actual pixel coordinates from natural image size
+    const cropX = pixelCrop.x * scaleX;
+    const cropY = pixelCrop.y * scaleY;
+    const cropWidth = pixelCrop.width * scaleX;
+    const cropHeight = pixelCrop.height * scaleY;
 
-    // Draw the cropped portion of the image
+    // Set canvas size to match the crop area (use natural size for quality)
+    canvas.width = cropWidth;
+    canvas.height = cropHeight;
+
+    // Use high-quality image rendering
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = 'high';
+
+    // Draw the cropped portion of the image at full quality
     ctx.drawImage(
       image,
-      pixelCrop.x,
-      pixelCrop.y,
-      pixelCrop.width,
-      pixelCrop.height,
+      cropX,
+      cropY,
+      cropWidth,
+      cropHeight,
       0,
       0,
-      pixelCrop.width,
-      pixelCrop.height
+      cropWidth,
+      cropHeight
     );
 
+    // Use PNG format to maintain quality (or detect original format)
     return new Promise((resolve, reject) => {
+      // Try to maintain original format if possible, otherwise use PNG for quality
+      const mimeType = imageSrc.startsWith('data:') 
+        ? imageSrc.split(';')[0].split(':')[1] 
+        : 'image/png';
+      
+      // Use high quality - PNG for lossless, or high quality JPEG
+      const quality = mimeType === 'image/png' ? undefined : 0.98;
+      
       canvas.toBlob((blob) => {
         if (blob) {
           resolve(blob);
         } else {
           reject(new Error("Failed to create blob"));
         }
-      }, "image/jpeg", 0.95);
+      }, mimeType, quality);
     });
   };
 
