@@ -90,41 +90,58 @@ export default function CallPage() {
       const peerConnection = createPeerConnection();
       peerConnectionRef.current = peerConnection;
       
-      // Monitor peer connection state with recovery
+      // Note: Connection state monitoring is already set up in createPeerConnection()
+      // But we add additional monitoring here for call-specific handling
+      const originalOnConnectionStateChange = peerConnection.onconnectionstatechange;
       peerConnection.onconnectionstatechange = () => {
-        const state = peerConnection.connectionState;
-        console.log('🔗 Peer connection state:', state);
+        if (originalOnConnectionStateChange) {
+          originalOnConnectionStateChange.call(peerConnection);
+        }
         
-        if (state === 'failed') {
-          console.error('❌ Connection failed - attempting recovery');
-          // Try to restart ICE
-          try {
-            peerConnection.restartIce();
-            console.log('🔄 ICE restart initiated');
-          } catch (e) {
-            console.error('Failed to restart ICE:', e);
-          }
-        } else if (state === 'connected') {
-          console.log('✅ Peer connection established successfully');
-        } else if (state === 'disconnected') {
-          console.warn('⚠️ Connection disconnected - may reconnect');
+        const state = peerConnection.connectionState;
+        
+        // When connected, verify all tracks are active
+        if (state === 'connected') {
+          console.log('✅ Connection established - verifying tracks...');
+          const senders = peerConnection.getSenders();
+          senders.forEach((sender, index) => {
+            if (sender.track) {
+              console.log(`Sender ${index}:`, {
+                kind: sender.track.kind,
+                enabled: sender.track.enabled,
+                muted: sender.track.muted,
+                readyState: sender.track.readyState,
+                id: sender.track.id,
+              });
+              
+              // Ensure track is enabled
+              if (!sender.track.enabled) {
+                console.warn(`⚠️ Track ${sender.track.id} is disabled - enabling...`);
+                sender.track.enabled = true;
+              }
+            } else {
+              console.warn(`⚠️ Sender ${index} has no track!`);
+            }
+          });
+          
+          // Check transceivers
+          const transceivers = peerConnection.getTransceivers();
+          transceivers.forEach((transceiver, index) => {
+            console.log(`Transceiver ${index}:`, {
+              kind: transceiver.sender.track?.kind,
+              direction: transceiver.direction,
+              currentDirection: transceiver.currentDirection,
+              receiverTrack: transceiver.receiver.track?.id,
+            });
+          });
         }
       };
       
+      // Additional ICE monitoring
+      const originalOnIceConnectionStateChange = peerConnection.oniceconnectionstatechange;
       peerConnection.oniceconnectionstatechange = () => {
-        const iceState = peerConnection.iceConnectionState;
-        console.log('🧊 ICE connection state:', iceState);
-        
-        if (iceState === 'failed') {
-          console.error('❌ ICE connection failed - restarting ICE');
-          try {
-            peerConnection.restartIce();
-            console.log('🔄 ICE restart initiated');
-          } catch (e) {
-            console.error('Failed to restart ICE:', e);
-          }
-        } else if (iceState === 'connected' || iceState === 'completed') {
-          console.log('✅ ICE connection established');
+        if (originalOnIceConnectionStateChange) {
+          originalOnIceConnectionStateChange.call(peerConnection);
         }
       };
       

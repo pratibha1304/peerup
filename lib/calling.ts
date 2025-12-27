@@ -201,19 +201,52 @@ export function createPeerConnection() {
   
   // Add comprehensive connection state monitoring
   pc.onconnectionstatechange = () => {
-    console.log('🔗 Peer connection state:', pc.connectionState);
-    if (pc.connectionState === 'failed') {
+    const state = pc.connectionState;
+    console.log('🔗 Peer connection state:', state);
+    
+    if (state === 'failed') {
       console.error('❌ Peer connection failed - attempting to restart ICE');
-      // Try to restart ICE
-      pc.restartIce();
+      try {
+        pc.restartIce();
+        console.log('🔄 ICE restart initiated');
+      } catch (error) {
+        console.error('Failed to restart ICE:', error);
+      }
+    } else if (state === 'connected') {
+      console.log('✅ Peer connection fully established');
+      // Verify tracks are still active
+      const senders = pc.getSenders();
+      senders.forEach(sender => {
+        if (sender.track) {
+          console.log('Sender track state:', {
+            kind: sender.track.kind,
+            enabled: sender.track.enabled,
+            muted: sender.track.muted,
+            readyState: sender.track.readyState,
+          });
+        }
+      });
+    } else if (state === 'disconnected') {
+      console.warn('⚠️ Peer connection disconnected - may reconnect');
     }
   };
   
   pc.oniceconnectionstatechange = () => {
-    console.log('🧊 ICE connection state:', pc.iceConnectionState);
-    if (pc.iceConnectionState === 'failed') {
+    const iceState = pc.iceConnectionState;
+    console.log('🧊 ICE connection state:', iceState);
+    
+    if (iceState === 'failed') {
       console.error('❌ ICE connection failed - attempting to restart');
-      pc.restartIce();
+      try {
+        pc.restartIce();
+        console.log('🔄 ICE restart initiated');
+      } catch (error) {
+        console.error('Failed to restart ICE:', error);
+      }
+    } else if (iceState === 'connected' || iceState === 'completed') {
+      console.log('✅ ICE connection established');
+    } else if (iceState === 'disconnected') {
+      console.warn('⚠️ ICE connection disconnected');
     }
   };
   
@@ -289,23 +322,61 @@ export function addLocalTracksToPeer(
     // For audio tracks, monitor if they're actually sending data
     if (track.kind === 'audio') {
       // Monitor sender statistics to verify audio is being sent
-      setInterval(async () => {
+      const statsInterval = setInterval(async () => {
         try {
+          // Only check stats if connection is established
+          if (peerConnection.connectionState !== 'connected' && 
+              peerConnection.connectionState !== 'connecting') {
+            return;
+          }
+          
           const stats = await sender.getStats();
+          let hasAudioStats = false;
           stats.forEach((report) => {
             if (report.type === 'outbound-rtp' && report.mediaType === 'audio') {
+              hasAudioStats = true;
+              const bytesSent = report.bytesSent || 0;
+              const packetsSent = report.packetsSent || 0;
+              
               console.log('Audio transmission stats:', {
-                bytesSent: report.bytesSent,
-                packetsSent: report.packetsSent,
+                bytesSent,
+                packetsSent,
                 packetsLost: report.packetsLost,
                 roundTripTime: report.roundTripTime,
+                connectionState: peerConnection.connectionState,
+                iceConnectionState: peerConnection.iceConnectionState,
               });
+              
+              // If no bytes are being sent and connection is established, there's a problem
+              if (bytesSent === 0 && packetsSent === 0 && 
+                  peerConnection.connectionState === 'connected') {
+                console.error('⚠️ Connection established but no audio being sent!');
+                console.error('Track state:', {
+                  enabled: track.enabled,
+                  muted: track.muted,
+                  readyState: track.readyState,
+                });
+                console.error('Sender state:', {
+                  track: sender.track?.id,
+                  trackEnabled: sender.track?.enabled,
+                });
+              }
             }
           });
+          
+          if (!hasAudioStats && peerConnection.connectionState === 'connected') {
+            console.warn('⚠️ No audio stats found but connection is established');
+          }
         } catch (error) {
           console.error('Error getting sender stats:', error);
         }
       }, 3000);
+      
+      // Clean up interval when track ends
+      track.onended = () => {
+        clearInterval(statsInterval);
+        console.warn(`Local ${track.kind} track ended:`, track.id);
+      };
     }
   });
   
