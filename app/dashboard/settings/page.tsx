@@ -86,16 +86,21 @@ export default function SettingsPage() {
     }
   };
 
-  // Check for OAuth callback parameters
+  // Check for OAuth callback parameters and refresh connection status
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const error = params.get('error');
     const success = params.get('calendar_connected');
     
     if (error) {
-      alert(`Calendar connection error: ${error}`);
+      const errorMsg = decodeURIComponent(error);
+      alert(`Calendar connection error: ${errorMsg}`);
       // Clean URL
       window.history.replaceState({}, '', '/dashboard/settings');
+      // Refresh connection status
+      if (user) {
+        checkCalendarConnection();
+      }
     }
     
     if (success === 'true') {
@@ -103,8 +108,12 @@ export default function SettingsPage() {
       alert('Google Calendar connected successfully!');
       // Clean URL
       window.history.replaceState({}, '', '/dashboard/settings');
+      // Refresh connection status to ensure it's updated
+      if (user) {
+        checkCalendarConnection();
+      }
     }
-  }, []);
+  }, [user]);
 
   if (loading) {
     return (

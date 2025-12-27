@@ -137,11 +137,16 @@ export default function DashboardPage() {
             <Link
               key={card.id}
               href={cardRoute}
-              className={isClickable ? 'cursor-pointer' : ''}
+              className={isClickable ? 'cursor-pointer block' : 'block'}
+              onClick={(e) => {
+                if (!isClickable) {
+                  e.preventDefault();
+                }
+              }}
             >
               <div
-                className={`rounded-xl md:rounded-2xl border bg-white/70 dark:bg-[#23272f] p-3 md:p-4 shadow-sm ${
-                  isClickable ? 'hover:shadow-md transition-shadow' : ''
+                className={`rounded-xl md:rounded-2xl border bg-white/70 dark:bg-[#23272f] p-3 md:p-4 shadow-sm transition-all ${
+                  isClickable ? 'hover:shadow-md hover:scale-105 cursor-pointer' : 'cursor-default'
                 }`}
               >
                 <div className="flex items-start justify-between mb-3 md:mb-6">
