@@ -90,13 +90,51 @@ export default function CallPage() {
       const peerConnection = createPeerConnection();
       peerConnectionRef.current = peerConnection;
       
-      // Monitor peer connection state
+      // Monitor peer connection state with recovery
       peerConnection.onconnectionstatechange = () => {
-        console.log('Peer connection state:', peerConnection.connectionState);
+        const state = peerConnection.connectionState;
+        console.log('🔗 Peer connection state:', state);
+        
+        if (state === 'failed') {
+          console.error('❌ Connection failed - attempting recovery');
+          // Try to restart ICE
+          try {
+            peerConnection.restartIce();
+            console.log('🔄 ICE restart initiated');
+          } catch (e) {
+            console.error('Failed to restart ICE:', e);
+          }
+        } else if (state === 'connected') {
+          console.log('✅ Peer connection established successfully');
+        } else if (state === 'disconnected') {
+          console.warn('⚠️ Connection disconnected - may reconnect');
+        }
       };
       
       peerConnection.oniceconnectionstatechange = () => {
-        console.log('ICE connection state:', peerConnection.iceConnectionState);
+        const iceState = peerConnection.iceConnectionState;
+        console.log('🧊 ICE connection state:', iceState);
+        
+        if (iceState === 'failed') {
+          console.error('❌ ICE connection failed - restarting ICE');
+          try {
+            peerConnection.restartIce();
+            console.log('🔄 ICE restart initiated');
+          } catch (e) {
+            console.error('Failed to restart ICE:', e);
+          }
+        } else if (iceState === 'connected' || iceState === 'completed') {
+          console.log('✅ ICE connection established');
+        }
+      };
+      
+      peerConnection.onicegatheringstatechange = () => {
+        console.log('🧊 ICE gathering state:', peerConnection.iceGatheringState);
+      };
+      
+      // Monitor for ICE candidate errors
+      peerConnection.onicecandidateerror = (event) => {
+        console.error('❌ ICE candidate error:', event);
       };
 
       // Add local tracks
@@ -125,17 +163,28 @@ export default function CallPage() {
 
       if (caller) {
         // Caller: create offer
-        console.log('Caller: Creating offer...');
+        console.log('📞 Caller: Creating offer...');
         const offer = await createOffer(peerConnection);
         await saveOfferToFirestore(partnerId, offer);
-        console.log('Caller: Offer created and saved');
+        console.log('✅ Caller: Offer created and saved');
 
-        // Listen for answer
+        // Listen for answer with retry logic
         const unsubscribe = listenToCallRoom(partnerId, async (data) => {
           if (data.answer && !peerConnection.currentRemoteDescription) {
-            console.log('Caller: Received answer, setting remote description...');
-            await peerConnection.setRemoteDescription(new RTCSessionDescription(data.answer));
-            console.log('Caller: Remote description set');
+            console.log('📥 Caller: Received answer, setting remote description...');
+            try {
+              await peerConnection.setRemoteDescription(new RTCSessionDescription(data.answer));
+              console.log('✅ Caller: Remote description set successfully');
+            } catch (error) {
+              console.error('❌ Caller: Failed to set remote description:', error);
+              // Retry once
+              try {
+                await peerConnection.setRemoteDescription(new RTCSessionDescription(data.answer));
+                console.log('✅ Caller: Remote description set on retry');
+              } catch (retryError) {
+                console.error('❌ Caller: Retry also failed:', retryError);
+              }
+            }
           }
         });
         candidateListenersRef.current.push(unsubscribe);
@@ -143,12 +192,25 @@ export default function CallPage() {
         // Callee: listen for offer and create answer
         const unsubscribe = listenToCallRoom(partnerId, async (data) => {
           if (data.offer && !peerConnection.currentRemoteDescription) {
-            console.log('Callee: Received offer, creating answer...');
-            await peerConnection.setRemoteDescription(new RTCSessionDescription(data.offer));
-            console.log('Callee: Remote description set, creating answer...');
-            const answer = await createAnswer(peerConnection, data.offer);
-            await saveAnswerToFirestore(partnerId, answer);
-            console.log('Callee: Answer created and saved');
+            console.log('📥 Callee: Received offer, creating answer...');
+            try {
+              await peerConnection.setRemoteDescription(new RTCSessionDescription(data.offer));
+              console.log('✅ Callee: Remote description set, creating answer...');
+              const answer = await createAnswer(peerConnection, data.offer);
+              await saveAnswerToFirestore(partnerId, answer);
+              console.log('✅ Callee: Answer created and saved');
+            } catch (error) {
+              console.error('❌ Callee: Error processing offer:', error);
+              // Retry once
+              try {
+                await peerConnection.setRemoteDescription(new RTCSessionDescription(data.offer));
+                const answer = await createAnswer(peerConnection, data.offer);
+                await saveAnswerToFirestore(partnerId, answer);
+                console.log('✅ Callee: Answer created on retry');
+              } catch (retryError) {
+                console.error('❌ Callee: Retry also failed:', retryError);
+              }
+            }
           }
         });
         candidateListenersRef.current.push(unsubscribe);

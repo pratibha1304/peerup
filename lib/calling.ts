@@ -30,7 +30,15 @@ const stunServers: RTCConfiguration = {
   iceServers: [
     { urls: 'stun:stun.l.google.com:19302' },
     { urls: 'stun:stun1.l.google.com:19302' },
+    { urls: 'stun:stun2.l.google.com:19302' },
+    { urls: 'stun:stun3.l.google.com:19302' },
+    { urls: 'stun:stun4.l.google.com:19302' },
+    // Additional public STUN servers as fallback
+    { urls: 'stun:stun.stunprotocol.org:3478' },
+    { urls: 'stun:stun.voiparound.com' },
+    { urls: 'stun:stun.voipbuster.com' },
   ],
+  iceCandidatePoolSize: 10, // Pre-gather more candidates
 };
 
 export function getPartnershipId(uidA: string, uidB: string): string {
@@ -189,7 +197,36 @@ export function listenToCallRoom(
 }
 
 export function createPeerConnection() {
-  return new RTCPeerConnection(stunServers);
+  const pc = new RTCPeerConnection(stunServers);
+  
+  // Add comprehensive connection state monitoring
+  pc.onconnectionstatechange = () => {
+    console.log('🔗 Peer connection state:', pc.connectionState);
+    if (pc.connectionState === 'failed') {
+      console.error('❌ Peer connection failed - attempting to restart ICE');
+      // Try to restart ICE
+      pc.restartIce();
+    }
+  };
+  
+  pc.oniceconnectionstatechange = () => {
+    console.log('🧊 ICE connection state:', pc.iceConnectionState);
+    if (pc.iceConnectionState === 'failed') {
+      console.error('❌ ICE connection failed - attempting to restart');
+      pc.restartIce();
+    }
+  };
+  
+  pc.onicegatheringstatechange = () => {
+    console.log('🧊 ICE gathering state:', pc.iceGatheringState);
+  };
+  
+  // Monitor ICE candidates
+  pc.onicecandidateerror = (event) => {
+    console.error('❌ ICE candidate error:', event);
+  };
+  
+  return pc;
 }
 
 export async function startCallLocalStream(withVideo: boolean = false): Promise<MediaStream> {
@@ -303,20 +340,31 @@ export function listenForIceCandidates(
   peerConnection: RTCPeerConnection,
   candidatesPath: 'offerCandidates' | 'answerCandidates'
 ) {
-  // Send local ICE candidates
+  // Send local ICE candidates with error handling
   peerConnection.onicecandidate = async (event) => {
     if (event.candidate) {
-      const candidatesRef = collection(
-        db,
-        'callRooms',
-        partnershipId,
-        candidatesPath
-      );
-      await addDoc(candidatesRef, event.candidate.toJSON());
+      try {
+        const candidatesRef = collection(
+          db,
+          'callRooms',
+          partnershipId,
+          candidatesPath
+        );
+        await addDoc(candidatesRef, event.candidate.toJSON());
+        console.log('✅ ICE candidate sent:', {
+          type: event.candidate.type,
+          protocol: event.candidate.protocol,
+          address: event.candidate.address,
+        });
+      } catch (error) {
+        console.error('❌ Failed to send ICE candidate:', error);
+      }
+    } else {
+      console.log('✅ All ICE candidates gathered');
     }
   };
 
-  // Listen for remote ICE candidates
+  // Listen for remote ICE candidates with error handling
   const candidatesRef = collection(
     db,
     'callRooms',
@@ -325,10 +373,19 @@ export function listenForIceCandidates(
   );
 
   return onSnapshot(candidatesRef, (snapshot) => {
-    snapshot.docChanges().forEach((change) => {
+    snapshot.docChanges().forEach(async (change) => {
       if (change.type === 'added') {
-        const candidate = change.doc.data();
-        peerConnection.addIceCandidate(new RTCIceCandidate(candidate));
+        try {
+          const candidate = change.doc.data();
+          await peerConnection.addIceCandidate(new RTCIceCandidate(candidate));
+          console.log('✅ Remote ICE candidate added:', {
+            type: candidate.type,
+            protocol: candidate.protocol,
+          });
+        } catch (error) {
+          console.error('❌ Failed to add ICE candidate:', error);
+          // Don't throw - continue processing other candidates
+        }
       }
     });
   });
@@ -346,12 +403,37 @@ export async function createOffer(peerConnection: RTCPeerConnection): Promise<RT
     }
   });
   
+  // Create offer with proper configuration
   const offer = await peerConnection.createOffer({
     offerToReceiveAudio: true,
     offerToReceiveVideo: false, // Will be set based on call type
+    iceRestart: false, // Don't restart ICE on first offer
   });
   
+  // Set codec preferences for better audio quality
+  const audioTransceivers = peerConnection.getTransceivers().filter(
+    t => t.sender.track?.kind === 'audio'
+  );
+  
+  for (const transceiver of audioTransceivers) {
+    if (transceiver.setCodecPreferences) {
+      const codecs = RTCRtpReceiver.getCapabilities('audio').codecs;
+      // Prefer Opus codec for better quality
+      const opusCodec = codecs.find(c => c.mimeType.includes('opus'));
+      if (opusCodec) {
+        const preferredCodecs = [opusCodec, ...codecs.filter(c => c !== opusCodec)];
+        try {
+          transceiver.setCodecPreferences(preferredCodecs);
+          console.log('✅ Set Opus as preferred audio codec');
+        } catch (e) {
+          console.warn('Could not set codec preferences:', e);
+        }
+      }
+    }
+  }
+  
   await peerConnection.setLocalDescription(offer);
+  console.log('✅ Offer created and local description set');
   return offer;
 }
 
@@ -359,7 +441,13 @@ export async function createAnswer(
   peerConnection: RTCPeerConnection,
   offer: any
 ): Promise<RTCSessionDescriptionInit> {
-  await peerConnection.setRemoteDescription(new RTCSessionDescription(offer));
+  try {
+    await peerConnection.setRemoteDescription(new RTCSessionDescription(offer));
+    console.log('✅ Remote description set for answer');
+  } catch (error) {
+    console.error('❌ Failed to set remote description:', error);
+    throw error;
+  }
   
   // Ensure all transceivers are configured before creating answer
   peerConnection.getTransceivers().forEach((transceiver) => {
@@ -372,12 +460,35 @@ export async function createAnswer(
     }
   });
   
+  // Set codec preferences for better audio quality
+  const audioTransceivers = peerConnection.getTransceivers().filter(
+    t => t.sender.track?.kind === 'audio'
+  );
+  
+  for (const transceiver of audioTransceivers) {
+    if (transceiver.setCodecPreferences) {
+      const codecs = RTCRtpReceiver.getCapabilities('audio').codecs;
+      // Prefer Opus codec for better quality
+      const opusCodec = codecs.find(c => c.mimeType.includes('opus'));
+      if (opusCodec) {
+        const preferredCodecs = [opusCodec, ...codecs.filter(c => c !== opusCodec)];
+        try {
+          transceiver.setCodecPreferences(preferredCodecs);
+          console.log('✅ Set Opus as preferred audio codec in answer');
+        } catch (e) {
+          console.warn('Could not set codec preferences:', e);
+        }
+      }
+    }
+  }
+  
   const answer = await peerConnection.createAnswer({
     offerToReceiveAudio: true,
     offerToReceiveVideo: false, // Will be set based on call type
   });
   
   await peerConnection.setLocalDescription(answer);
+  console.log('✅ Answer created and local description set');
   return answer;
 }
 
